@@ -75,6 +75,7 @@ test("openai monta requisição com json_schema e fallback", () => {
 test("openai sem choices vira erro de formato", () => {
   assert.throws(() => openai.parseResponse({}), (e) => e instanceof ProviderError && e.kind === "format");
   assert.throws(() => openai.parseResponse({ choices: [] }), (e) => e instanceof ProviderError && e.kind === "format");
+  assert.throws(() => openai.parseResponse({ choices: [null] }), (e) => e instanceof ProviderError && e.kind === "format");
 });
 test("mapHttpError classifica", () => {
   assert.equal(claude.mapHttpError(401, {}).kind, "auth");
