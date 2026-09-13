@@ -93,19 +93,22 @@ async function handleMessage(message) {
     case "GET_STATE":
       return { ok: true, state: currentState() };
     case "UNDO":
+      if (session.originalMode) return originalModeBlockedReply();
       doUndo(message.requestId);
       return { ok: true, state: currentState() };
     case "UNDO_ALL":
+      if (session.originalMode) return originalModeBlockedReply();
       doUndoAll();
       return { ok: true, state: currentState() };
     case "REDO_ALL":
+    case "REAPPLY":
+      // REAPPLY é alias de REDO_ALL (refaz toda entrada desfeita) — não é
+      // um refresh à toa: reaplicar de fato as ops é o que a ação promete.
+      if (session.originalMode) return originalModeBlockedReply();
       doRedoAll();
       return { ok: true, state: currentState() };
     case "TOGGLE_ORIGINAL":
       doToggleOriginal();
-      return { ok: true, state: currentState() };
-    case "REAPPLY":
-      refresh();
       return { ok: true, state: currentState() };
     case "SAVE_PRESET":
       await savePresetFlow(message.name);
@@ -290,7 +293,25 @@ async function submitRequest(text) {
 // Step 5: desfazer / refazer / modo original
 // ---------------------------------------------------------------------------
 
+// Desfazer/refazer individual não faz sentido com o modo original ligado:
+// `session.undoRequest`/`redoRequest` já viram no-op nesse estado (ver
+// lib/session.js), mas aqui a gente também barra antes de mexer e avisa o
+// usuário — tanto pelo botão do painel quanto por mensagem (ver `handleMessage`).
+const ORIGINAL_MODE_BLOCK_MSG = "Saia do modo original para desfazer/refazer.";
+
+function originalModeBlockedReply() {
+  if (panel) panel.setError(ORIGINAL_MODE_BLOCK_MSG);
+  return { ok: false, error: ORIGINAL_MODE_BLOCK_MSG };
+}
+
+function blockIfOriginal() {
+  if (!session.originalMode) return false;
+  if (panel) panel.setError(ORIGINAL_MODE_BLOCK_MSG);
+  return true;
+}
+
 function doUndo(id) {
+  if (blockIfOriginal()) return;
   const found = currentState().history.find((h) => h.id === id);
   session.undoRequest(id);
   if (found) logger.undo({ n: found.n, request: found.request });
@@ -298,6 +319,7 @@ function doUndo(id) {
 }
 
 function doUndoAll() {
+  if (blockIfOriginal()) return;
   const active = currentState().history.filter((h) => !h.undone);
   for (const h of active) session.undoRequest(h.id);
   for (const h of active) logger.undo({ n: h.n, request: h.request });
@@ -305,6 +327,7 @@ function doUndoAll() {
 }
 
 function doRedoAll() {
+  if (blockIfOriginal()) return;
   const undone = currentState().history.filter((h) => h.undone);
   for (const h of undone) session.redoRequest(h.id);
   refresh();
@@ -362,6 +385,19 @@ async function sendToBackground(message) {
 // Step 7: presets
 // ---------------------------------------------------------------------------
 
+// `panel.toast(...)` só aparece na tela se o painel estiver com
+// `display:flex` (`show()`) — o toast é um filho do container do painel.
+// SAVE_PRESET e DISABLE_AUTO podem chegar sem o painel nunca ter sido
+// aberto nesta sessão (banner do indicador, popup, sidebar do DevTools), daí
+// abrir o painel antes de mandar o toast; também loga no console para quem
+// está acompanhando por ali.
+function showToast(msg) {
+  const p = ensurePanel();
+  if (!p.isOpen()) p.show();
+  p.toast(msg);
+  console.info(`[aiSiteEditor] ${msg}`);
+}
+
 async function savePresetFlow(providedName) {
   let name = providedName;
   if (!name) {
@@ -370,7 +406,7 @@ async function savePresetFlow(providedName) {
   }
   const ops = session.collectPresetOps();
   await libs.storage.savePreset(chrome.storage.local, location.origin, { name, ops });
-  ensurePanel().toast("Preset salvo. Ele não será aplicado sozinho; ligue 'auto-aplicar' no popup se quiser.");
+  showToast("Preset salvo. Ele não será aplicado sozinho; ligue 'auto-aplicar' no popup se quiser.");
 }
 
 async function applyPresetById(presetId) {
@@ -400,7 +436,7 @@ async function disableAutoFlow() {
   for (const id of ids) {
     await libs.storage.updatePreset(chrome.storage.local, location.origin, id, { autoApply: false });
   }
-  ensurePanel().toast("Auto-aplicar desligado. No próximo carregamento você verá o site original.");
+  showToast("Auto-aplicar desligado. No próximo carregamento você verá o site original.");
   refresh();
 }
 

@@ -131,6 +131,33 @@ test("toggleOriginal reverts active entries without marking them undone, then re
   assert.equal(session.activeCount(), 1);
 });
 
+test("undoRequest and redoRequest are blocked (no-op) while originalMode is on", () => {
+  const { doc, win } = makeDoc("<body><p id='a'>oi</p></body>");
+  const session = makeSession(doc, win);
+  session.selectOnly(doc.getElementById("a"));
+  const entry = session.addRequest({
+    request: "1",
+    summary: "s1",
+    ops: [{ op: "setStyle", selector: "#a", name: "color", value: "red", position: "" }],
+  });
+  assert.equal(doc.getElementById("a").style.color, "red");
+
+  session.toggleOriginal();
+  assert.equal(doc.getElementById("a").style.color, "", "DOM reverted to original by toggleOriginal");
+
+  const undoResult = session.undoRequest(entry.id);
+  assert.equal(undoResult, false, "undoRequest is a no-op while originalMode is on");
+  assert.equal(doc.getElementById("a").style.color, "", "DOM stays as original after the blocked undoRequest");
+
+  const redoResult = session.redoRequest(entry.id);
+  assert.equal(redoResult, false, "redoRequest is a no-op while originalMode is on");
+  assert.equal(doc.getElementById("a").style.color, "", "DOM still stays as original after the blocked redoRequest");
+
+  session.toggleOriginal();
+  assert.equal(doc.getElementById("a").style.color, "red", "entry is reactivated exactly once when leaving original mode");
+  assert.equal(session.activeCount(), 1);
+});
+
 test("collectPresetOps rewrites [data-aise-id=\"s1\"] selectors to stable ones", () => {
   const { doc, win } = makeDoc("<body><p id='a'>oi</p></body>");
   const session = makeSession(doc, win);
