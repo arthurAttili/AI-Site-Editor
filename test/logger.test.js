@@ -36,9 +36,27 @@ test("request loga grupo com alvos, provedor e mudanças", () => {
   const text = c.calls.map((x) => x[1]).join("\n");
   assert.match(text, /\[Editor IA\] Pedido #3 — "vermelho"/);
   assert.match(text, /s1 = button.x/);
-  assert.match(text, /claude · claude-opus-5 · 2,1 s/);
+  assert.match(text, /claude · claude-opus-5 · 2,1 s$/m);
   assert.match(text, /✔ setStyle button.x color: "" → "red"/);
   assert.match(text, /⚠ setText \.nada/);
+  assert.equal(c.calls.at(-1)[0], "groupEnd");
+});
+
+test("request sem ms não duplica separador", () => {
+  const c = spyConsole();
+  const log = createLogger(c);
+  log.request({
+    n: 1,
+    request: "teste",
+    targets: [],
+    provider: "claude",
+    model: "claude-opus-5",
+    ms: undefined,
+    records: [],
+  });
+  const text = c.calls.map((x) => x[1]).join("\n");
+  // Should be exactly "claude · claude-opus-5" with no trailing "·" or " s"
+  assert.match(text, /^claude · claude-opus-5$/m);
   assert.equal(c.calls.at(-1)[0], "groupEnd");
 });
 
