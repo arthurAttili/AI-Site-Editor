@@ -22,12 +22,16 @@ body {
 }
 
 .aise-btn-active,
-.aise-btn-active:hover {
+.aise-btn-active:hover:not(:disabled) {
   background: var(--aise-accent);
   color: var(--aise-accent-fg);
   border-color: var(--aise-accent);
   filter: none;
   opacity: 0.85;
+}
+
+.aise-btn-active:hover:not(:disabled) {
+  box-shadow: 0 4px 14px rgba(238, 141, 73, 0.45);
 }
 
 .aise-form textarea {

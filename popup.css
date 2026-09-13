@@ -80,18 +80,35 @@ select option {
   gap: 6px;
 }
 
+/* Botões: hover levanta 1px com sombra, active "afunda", foco por teclado
+   ganha anel laranja. Desabilitado nunca reage (:not(:disabled)). */
 .aise-btn {
   cursor: pointer;
   border: 1px solid var(--aise-border);
   background: var(--aise-surface);
   color: var(--aise-fg);
-  border-radius: 4px;
+  border-radius: 6px;
   padding: 5px 10px;
   font: inherit;
+  transition: background-color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease, filter 0.15s ease, transform 0.12s ease, opacity 0.15s ease;
 }
 
 .aise-btn:hover:not(:disabled) {
   background: var(--aise-surface-hover);
+  border-color: var(--aise-accent);
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.14);
+  transform: translateY(-1px);
+}
+
+.aise-btn:active:not(:disabled) {
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
+  transform: translateY(0) scale(0.98);
+  transition-duration: 0.05s;
+}
+
+.aise-btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--aise-bg), 0 0 0 4px var(--aise-accent);
 }
 
 .aise-btn:disabled {
@@ -104,10 +121,16 @@ select option {
   background: var(--aise-accent);
   color: var(--aise-accent-fg);
   font-weight: 600;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.16);
 }
 
 .aise-btn-primary:hover:not(:disabled) {
-  filter: brightness(1.05);
+  filter: brightness(1.06);
+  box-shadow: 0 4px 14px rgba(238, 141, 73, 0.45);
+}
+
+.aise-btn-primary:active:not(:disabled) {
+  filter: brightness(0.95);
 }
 
 .aise-btn-small {
@@ -152,6 +175,18 @@ select option {
   display: flex;
   flex-direction: column;
   gap: 6px;
+  transition: border-color 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.aise-popup-preset:hover {
+  border-color: rgba(238, 141, 73, 0.6);
+  background: var(--aise-surface);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.aise-popup-retry {
+  display: flex;
+  justify-content: flex-start;
 }
 
 .aise-popup-preset-info {
@@ -183,6 +218,7 @@ select option {
 
 .aise-popup-preset-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 6px;
 }
 
@@ -205,9 +241,23 @@ select option {
   color: var(--aise-accent);
   font: inherit;
   font-weight: 600;
-  padding: 2px 0;
+  padding: 2px 6px;
+  border-radius: 4px;
+  transition: background-color 0.15s ease, filter 0.15s ease;
 }
 
 .aise-popup-link:hover {
   text-decoration: underline;
+  background: var(--aise-surface);
+  filter: brightness(1.08);
+}
+
+.aise-popup-link:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--aise-accent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .aise-btn, .aise-popup-preset, .aise-popup-link { transition: none; }
+  .aise-btn:hover:not(:disabled), .aise-btn:active:not(:disabled) { transform: none; }
 }

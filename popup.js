@@ -6,6 +6,8 @@
 
 import { getPresets, updatePreset, deletePreset } from "./lib/storage.js";
 import { createPopupView } from "./lib/ui/popup-view.js";
+import { buildPresetReport } from "./lib/report.js";
+import { copyText } from "./lib/ui/clipboard.js";
 
 const UNEDITABLE_TEXT = "Esta página não pode ser editada";
 
@@ -17,6 +19,8 @@ const view = createPopupView(document, root, {
   onApplyPreset,
   onSetAutoApply,
   onRemovePreset,
+  onCopyPresetLog,
+  onRetry,
   onOpenOptions,
 });
 
@@ -25,10 +29,26 @@ let origin = null;
 let presetsCache = [];
 
 // GET_STATE pode chegar antes do content script terminar de carregar (aba
-// recém-aberta) ou nunca — nesse caso injeta `content.js` uma vez e tenta de
-// novo; se ainda assim falhar, `setState(null)` (badge "extensão não
-// carregada nesta aba", conforme regra do controller para a Task 13).
-const GET_STATE_TIMEOUT_MS = 5000;
+// recém-aberta, página pesada ainda em `document_idle`) ou nunca (aba aberta
+// antes de a extensão ser instalada/recarregada, página que bloqueia scripts).
+// Estratégia: tenta; na primeira falha injeta `content.js` uma vez (ele tem
+// guarda contra carga dupla) e volta a tentar com esperas crescentes. Só
+// depois disso mostra "extensão não carregada" — com o motivo e um botão
+// "Tentar de novo", em vez de deixar os botões mudos sem explicação.
+const GET_STATE_TIMEOUT_MS = 2500;
+const RETRY_DELAYS_MS = [300, 600, 1000, 1500];
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+// Mensagens cruas do Chrome ("Could not establish connection. Receiving end
+// does not exist.", "The message port closed…") não dizem nada ao usuário.
+function friendlyError(err) {
+  const raw = (err && err.message) || String(err || "");
+  if (/Receiving end does not exist|message port closed|tempo esgotado|Cannot access|cannot be scripted|Frame with ID/i.test(raw)) {
+    return `Não foi possível falar com a página (${raw.replace(/\.$/, "")}). Recarregue a aba (F5) e tente de novo.`;
+  }
+  return raw || "Não foi possível falar com a página. Recarregue a aba (F5) e tente de novo.";
+}
 
 // `sendMessage` pode nunca resolver: se o content script registrou o listener
 // mas travou antes de responder, a promise fica pendurada e o popup mostra
@@ -49,29 +69,43 @@ async function sendGetState(id) {
   }
 }
 
+// Devolve a resposta do content script (`{ok, state}` ou `{ok:false, error}`)
+// ou, esgotadas as tentativas, `{ok:false, error}` com o último motivo.
 async function getStateWithRetry(id) {
-  try {
-    return await sendGetState(id);
-  } catch {
+  let lastError = null;
+  let injected = false;
+  for (let attempt = 0; attempt <= RETRY_DELAYS_MS.length; attempt++) {
     try {
-      await chrome.scripting.executeScript({ target: { tabId: id }, files: ["content.js"] });
-    } catch {
-      return null;
+      const reply = await sendGetState(id);
+      if (reply) return reply;
+      lastError = new Error("a página não respondeu");
+    } catch (err) {
+      lastError = err;
     }
-    try {
-      return await sendGetState(id);
-    } catch {
-      return null;
+    if (!injected) {
+      injected = true;
+      try {
+        await chrome.scripting.executeScript({ target: { tabId: id }, files: ["content.js"] });
+      } catch (err) {
+        // Sem permissão para injetar (página do Chrome, loja, PDF…): não adianta insistir.
+        return { ok: false, error: friendlyError(err) };
+      }
     }
+    if (attempt < RETRY_DELAYS_MS.length) await sleep(RETRY_DELAYS_MS[attempt]);
   }
+  return { ok: false, error: friendlyError(lastError) };
 }
 
 async function refreshState() {
   const reply = await getStateWithRetry(tabId);
   if (reply && reply.ok) {
     view.setState(reply.state);
+    view.setError(null);
   } else {
+    // O content script já devolve mensagem em pt-BR quando falhou ao iniciar;
+    // as falhas de transporte passam por friendlyError em getStateWithRetry.
     view.setState(null);
+    view.setError((reply && reply.error) || friendlyError(null));
   }
 }
 
@@ -100,17 +134,20 @@ async function sendAction(type, extra = {}) {
 // `setError` — nunca deixa uma exceção escapar para o console do popup.
 async function runAction(fn) {
   view.setBusy(true);
+  let actionError = null;
   try {
     await fn();
-    view.setError(null);
   } catch (err) {
-    view.setError((err && err.message) || String(err));
+    actionError = friendlyError(err);
   }
   try {
     await refreshAll();
   } catch (err) {
-    view.setError((err && err.message) || String(err));
+    actionError = actionError || friendlyError(err);
   }
+  // refreshState limpa/define o erro de conexão; o erro da ação em si tem
+  // precedência para o usuário saber por que o clique não fez nada.
+  if (actionError) view.setError(actionError);
   view.setBusy(false);
 }
 
@@ -148,6 +185,26 @@ function onRemovePreset(id) {
   const name = preset ? preset.name : "";
   if (!window.confirm(`Remover o preset "${name}"?`)) return;
   runAction(() => deletePreset(chrome.storage.local, origin, id));
+}
+
+// Log de handoff de um preset já salvo: não depende da página responder,
+// por isso não passa por runAction (que re-busca o estado da aba).
+async function onCopyPresetLog(id) {
+  const preset = presetsCache.find((p) => p.id === id);
+  if (!preset) return;
+  const md = buildPresetReport(preset, { origin, generatedAt: new Date() });
+  const ok = await copyText(md, { clipboard: navigator.clipboard, doc: document });
+  if (ok) {
+    view.flashPresetCopy(id);
+  } else {
+    view.setError("Não foi possível copiar o log. Tente de novo com o popup em foco.");
+  }
+}
+
+// Botão "Tentar de novo" (aparece quando a página não respondeu): só refaz
+// a busca de estado/presets, com a mesma sequência de injeção e retentativas.
+function onRetry() {
+  runAction(async () => {});
 }
 
 function onOpenOptions() {

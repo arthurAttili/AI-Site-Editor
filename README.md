@@ -44,6 +44,7 @@ Clique em "Salvar" para gravar.
    - O painel pode ser **arrastado pelo cabeçalho** para qualquer canto da tela; a posição escolhida vale até a página ser recarregada.
    - O botão **⧉** do cabeçalho abre o editor em uma **janela separada** do Chrome (útil quando o painel cobre o que você quer editar, ou para trabalhar com dois monitores). A janela mostra a mesma seleção, o mesmo histórico e os mesmos botões; o botão **"Selecionar elemento na página"** liga a mira na aba, e **"Voltar para a página"** fecha a janela e traz o painel de volta. Fechar a janela pelo X encerra a edição, como o × do painel.
 4. Escreva o pedido na caixa de texto (ex.: "deixe o botão vermelho e maior") e clique em **Aplicar** (ou Ctrl/Cmd+Enter).
+   - O elemento selecionado é a **referência** do pedido, não um limite: a IA recebe também um esboço da estrutura da página (uma linha por elemento, com ids, classes e o texto de cada um, marcando os selecionados) e pode alterar só aquele elemento, os irmãos dele, a seção inteira ou a página toda, conforme o que você pedir. "Deixe este botão vermelho" muda só o botão; "deixe todos os botões como este" ou "todos os títulos da página em azul" mudam todos de uma vez, de preferência com uma única regra de CSS em vez de elemento por elemento.
 5. O histórico de pedidos aparece no painel, cada um com um botão **Desfazer**. Os botões **Desfazer tudo** e **Refazer tudo** agem sobre todo o histórico da sessão.
 6. Todo pedido gera um grupo recolhido no Console do DevTools, com o prefixo `[Editor IA] Pedido #N — "texto do pedido"`, mostrando as operações pedidas e as alterações de fato aplicadas (ou o aviso, se alguma operação não encontrou o alvo).
 7. Na aba **Elements** do DevTools existe uma sub-aba **"Editor IA"**: mostra o elemento atualmente inspecionado, tem um botão **"Usar elemento selecionado"** (usa o `$0` do DevTools como alvo) e espelha o mesmo histórico de pedidos da página, com os mesmos botões de desfazer.
@@ -61,6 +62,8 @@ Quando um preset com auto-aplicar está ativo, a página muda assim que carrega,
 - O banner oferece **"Ver original"** (reverte visualmente as alterações e troca o badge para **ORIG**, cinza) e **"Desligar auto-aplicar"** (some as alterações desse preset a partir do próximo carregamento)
 
 Esse aviso **não pode ser desligado** enquanto há alterações ativas — dá para minimizá-lo numa pílula pequena, mas nunca escondê-lo por completo. Isso é proposital: o objetivo é que você nunca confunda uma versão do site modificada por você com o site de verdade.
+
+Cada preset listado no popup tem também um botão **"Copiar log"**: ele copia o mesmo relatório em Markdown do passo 8 de "Como usar", mas para aquele preset — os pedidos que o geraram, com seletores, HTML antes/depois e as operações — sem precisar reabrir a página nem refazer a sessão. Presets salvos por versões anteriores da extensão não guardaram o histórico dos pedidos; para eles o relatório lista só as operações finais e avisa que os valores anteriores não foram registrados.
 
 ## Privacidade
 
@@ -83,6 +86,7 @@ As chaves de API ficam apenas em `chrome.storage.local`, no seu computador, e s�
 - **Páginas fora de `http(s)`** (`chrome://`, `file://`, `chrome-extension://`, a Chrome Web Store) mostram "Esta página não pode ser editada" no popup, e o menu de contexto não abre o editor nelas.
 - **Documentos que não são HTML** — PDF no visualizador do Chrome, imagem aberta direto, XML — estão numa URL `http(s)` normal, então o popup **não** mostra "Esta página não pode ser editada": o content script simplesmente não se instala neles e o popup mostra "Extensão não carregada nesta aba".
 - **A sidebar do DevTools** precisa que o content script já esteja carregado na aba — em abas abertas antes de instalar/recarregar a extensão, a primeira ação (menu de contexto ou abrir o popup) injeta o script automaticamente.
+- **Botões do popup** — o popup mostra "Conectando à página…" enquanto pede o estado da aba; se a página não responder, injeta o content script e tenta de novo algumas vezes (cerca de 3 s no total). Se ainda assim falhar, mostra "Extensão não carregada nesta aba" com o motivo e um botão **"Tentar de novo"**. Depois de recarregar a própria extensão em `chrome://extensions`, as abas já abertas precisam de um F5. Repare que **"Ver original"** e **"Desfazer tudo"** ficam propositalmente desabilitados enquanto não há nenhuma alteração ativa na aba; os botões dos presets ("Aplicar agora", "Copiar log", "Remover") funcionam mesmo sem a página responder.
 
 ## Desenvolvimento
 
@@ -126,6 +130,12 @@ Sem build step: JS puro (ES modules), Node 24, testes com `node --test` e `jsdom
 - [ ] Depois de dois pedidos (um deles desfeito), clicar em "Copiar log" no painel, colar num editor e conferir: cabeçalho com site/página/data, seção "Contexto para quem for aplicar", só o pedido ativo listado (com "1 desfeito(s), omitido(s)"), seletor, caminho, HTML antes/depois e as operações com valores antigos → novos
 - [ ] Clicar em "Copiar log" na janela separada (⧉) e na sidebar do DevTools: o botão vira "Copiado ✓" por um instante e o conteúdo colado é o mesmo do painel
 - [ ] Abrir o popup numa aba que já estava aberta antes de instalar/recarregar a extensão e conferir que o content script é injetado no primeiro uso
+- [ ] Selecionar um único botão e pedir "deixe todos os botões da página com este mesmo estilo, fundo azul": todos os botões mudam (não só o selecionado) e o Console mostra uma operação `injectCSS` ou um seletor por classe, não uma operação por botão
+- [ ] Selecionar o mesmo botão e pedir "deixe este botão vermelho": só ele muda
+- [ ] Abrir o popup numa aba `chrome://` ou na loja do Chrome: "Extensão não carregada nesta aba" aparece com o motivo e o botão "Tentar de novo"; numa aba normal recém-recarregada o status passa de "Conectando à página…" para o estado da aba sem precisar clicar em nada
+- [ ] Numa aba com a página respondendo, os botões "Ver original" e "Desfazer tudo" só habilitam depois do primeiro pedido aplicado
+- [ ] Passar o mouse sobre os botões do painel, do popup, da janela separada, da sidebar e das Opções: cada botão levanta com sombra e o primário fica mais claro; ao clicar ele "afunda"; botões desabilitados não reagem; Tab pelo teclado mostra o anel laranja de foco
+- [ ] No popup, clicar em "Copiar log" de um preset salvo nesta versão: o botão vira "Copiado ✓" e o conteúdo colado traz os pedidos que geraram o preset (com HTML antes/depois); num preset salvo por uma versão anterior, o relatório lista só as operações e avisa que o histórico não foi registrado
 
 ## Licença
 

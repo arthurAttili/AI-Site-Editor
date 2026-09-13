@@ -21,6 +21,17 @@ test("presets CRUD por origin, autoApply nasce falso", async () => {
   const p = await savePreset(s, "https://x.com", { name: "A", ops: [{ op: "remove", selector: "#a", name: "", value: "", position: "" }] });
   assert.equal(p.autoApply, false);
   assert.ok(p.id && p.createdAt);
+  assert.deepEqual(p.history, [], "sem histórico informado nasce vazio");
+  assert.equal(p.url, "");
+  assert.equal(p.title, "");
+  const hist = [{ n: 1, request: "r", summary: "s", undone: false, targets: [], records: [] }];
+  const q = await savePreset(s, "https://x.com", { name: "B", ops: [], history: hist, url: "https://x.com/p", title: "P" });
+  assert.deepEqual(q.history, hist);
+  assert.equal(q.url, "https://x.com/p");
+  assert.equal(q.title, "P");
+  const stored = (await getPresets(s, "https://x.com")).find((x) => x.id === q.id);
+  assert.deepEqual(stored.history, hist, "histórico persiste no storage");
+  await deletePreset(s, "https://x.com", q.id);
   assert.equal((await getPresets(s, "https://x.com")).length, 1);
   assert.equal((await getPresets(s, "https://y.com")).length, 0);
   await updatePreset(s, "https://x.com", p.id, { autoApply: true });

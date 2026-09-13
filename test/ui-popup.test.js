@@ -159,3 +159,64 @@ test("o aviso fixo sobre auto-aplicar está sempre presente", () => {
     )
   );
 });
+
+test("cada preset tem um botão Copiar log que chama onCopyPresetLog; flashPresetCopy troca o rótulo, sobrevive a re-render e restaura no timer", () => {
+  const { doc, win } = makeDoc("<body><div id='root'></div></body>");
+  const root = doc.getElementById("root");
+  const calls = [];
+  const view = createPopupView(doc, root, { onCopyPresetLog: (id) => calls.push(id) });
+  view.setPresets([
+    { id: "p1", name: "A", ops: [1], autoApply: false },
+    { id: "p2", name: "B", ops: [], autoApply: false },
+  ]);
+  const btns = root.querySelectorAll('[data-action="copy-log"]');
+  assert.equal(btns.length, 2);
+  assert.equal(btns[0].textContent, "Copiar log");
+  assert.ok(btns[0].title.length > 0, "tem tooltip explicando");
+  btns[1].click();
+  assert.deepEqual(calls, ["p2"]);
+
+  const timers = [];
+  win.setTimeout = (fn, ms) => { timers.push({ fn, ms }); return timers.length; };
+  win.clearTimeout = (id) => { timers[id - 1] = null; };
+
+  view.flashPresetCopy("p1");
+  assert.equal(root.querySelector('[data-action="copy-log"][data-id="p1"]').textContent, "Copiado ✓");
+  assert.equal(root.querySelector('[data-action="copy-log"][data-id="p2"]').textContent, "Copiar log", "só o preset copiado muda");
+  assert.equal(timers[0].ms, 1500);
+
+  view.setBusy(true); // re-render da lista no meio do flash
+  view.setBusy(false);
+  assert.equal(root.querySelector('[data-action="copy-log"][data-id="p1"]').textContent, "Copiado ✓", "rótulo sobrevive ao re-render");
+
+  view.flashPresetCopy("p1", "Copiado ✓", 1500); // segundo clique cancela o timer anterior
+  assert.equal(timers[0], null);
+  timers[1].fn();
+  assert.equal(root.querySelector('[data-action="copy-log"][data-id="p1"]').textContent, "Copiar log");
+});
+
+test("status inicial é Conectando…; Tentar de novo só aparece quando a página não respondeu, chama onRetry e trava quando ocupado", () => {
+  const { doc } = makeDoc("<body><div id='root'></div></body>");
+  const root = doc.getElementById("root");
+  let retries = 0;
+  const view = createPopupView(doc, root, { onRetry: () => retries++ });
+  const retryBox = root.querySelector('[data-role="retry"]');
+  const retryBtn = root.querySelector('[data-action="retry"]');
+  assert.equal(root.querySelector('[data-role="status"]').textContent, "Conectando à página…");
+  assert.equal(retryBox.hidden, true, "escondido antes de saber se a página responde");
+
+  view.setState(null);
+  assert.equal(retryBox.hidden, false);
+  assert.equal(retryBtn.textContent, "Tentar de novo");
+  assert.equal(retryBtn.disabled, false);
+  retryBtn.click();
+  assert.equal(retries, 1);
+
+  view.setBusy(true);
+  assert.equal(retryBtn.disabled, true, "não empilha tentativas");
+  view.setBusy(false);
+  assert.equal(retryBtn.disabled, false);
+
+  view.setState({ activeCount: 0, originalMode: false });
+  assert.equal(retryBox.hidden, true, "some quando a página responde");
+});

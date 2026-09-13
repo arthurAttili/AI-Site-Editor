@@ -135,6 +135,8 @@ select option {
   white-space: nowrap;
 }
 
+/* Botões: hover levanta 1px com sombra, active "afunda", foco por teclado
+   ganha anel laranja. Desabilitado nunca reage (:not(:disabled)). */
 .aise-btn {
   cursor: pointer;
   border: 1px solid var(--aise-border);
@@ -143,10 +145,25 @@ select option {
   border-radius: 6px;
   padding: 7px 14px;
   font: inherit;
+  transition: background-color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease, filter 0.15s ease, transform 0.12s ease, opacity 0.15s ease;
 }
 
 .aise-btn:hover:not(:disabled) {
   background: var(--aise-surface-hover);
+  border-color: var(--aise-accent);
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.14);
+  transform: translateY(-1px);
+}
+
+.aise-btn:active:not(:disabled) {
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
+  transform: translateY(0) scale(0.98);
+  transition-duration: 0.05s;
+}
+
+.aise-btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--aise-bg), 0 0 0 4px var(--aise-accent);
 }
 
 .aise-btn:disabled {
@@ -159,10 +176,21 @@ select option {
   background: var(--aise-accent);
   color: var(--aise-accent-fg);
   font-weight: 600;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.16);
 }
 
 .aise-btn-primary:hover:not(:disabled) {
-  filter: brightness(1.05);
+  filter: brightness(1.06);
+  box-shadow: 0 4px 14px rgba(238, 141, 73, 0.45);
+}
+
+.aise-btn-primary:active:not(:disabled) {
+  filter: brightness(0.95);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .aise-btn { transition: none; }
+  .aise-btn:hover:not(:disabled), .aise-btn:active:not(:disabled) { transform: none; }
 }
 
 .aise-test-row {

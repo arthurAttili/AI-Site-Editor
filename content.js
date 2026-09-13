@@ -425,11 +425,15 @@ async function submitRequest(text) {
     shortLabel: libs.selector.shortLabel,
   });
   const historyForPrompt = currentState().history.map((h) => ({ request: h.request, summary: h.summary }));
+  // Estrutura compacta da página inteira: a seleção é só a referência — o
+  // modelo pode alvejar irmãos, a seção ou o documento todo a partir dela.
+  const outline = libs.serialize.serializeOutline(document);
 
   const { system, user } = libs.prompt.buildPrompt({
     language: settings.language,
     url: location.href,
     title: document.title,
+    outline,
     selection: ctx,
     history: historyForPrompt,
     request: text,
@@ -603,7 +607,9 @@ async function savePresetFlow(providedName) {
     if (!name) return; // cancelado silenciosamente
   }
   const ops = session.collectPresetOps();
-  await libs.storage.savePreset(chrome.storage.local, location.origin, { name, ops });
+  // Só os pedidos ativos: são exatamente os que geraram `ops`.
+  const history = session.exportHistory().filter((e) => !e.undone);
+  await libs.storage.savePreset(chrome.storage.local, location.origin, { name, ops, history, url: location.href, title: document.title });
   showToast("Preset salvo. Ele não será aplicado sozinho; ligue 'auto-aplicar' no popup se quiser.");
 }
 

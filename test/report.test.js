@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { buildReport, formatDate, CONTEXT_TEXT } from "../lib/report.js";
+import { buildReport, buildPresetReport, formatDate, CONTEXT_TEXT } from "../lib/report.js";
 
 const target = {
   id: "s1",
@@ -134,4 +134,38 @@ test("buildReport: setStyle mostra o valor pedido quando o DOM devolve o valor n
   });
   assert.match(md, /- setStyle em `#cta`: `background-color` "" → "rgb\(211, 47, 47\)" \(valor pedido: "#d32f2f"\)/);
   assert.match(md, /- setStyle em `#cta`: `color` "" → "red"\n/, "valor igual não repete");
+});
+
+test("buildPresetReport: usa o histórico guardado no preset (ignorando desfeitos) e cai nas ops quando não há histórico", () => {
+  const withHistory = buildPresetReport({
+    name: "Home azul", url: "https://site.com/home", title: "Home — Site",
+    ops: [{ op: "setStyle", selector: "#cta", name: "color", value: "blue" }],
+    history: [entry({ n: 1, request: "botão azul", summary: "Azul." }), entry({ n: 2, undone: true, request: "sumiu" })],
+  }, { origin: "https://site.com", generatedAt: new Date(2026, 8, 13, 10, 0) });
+  assert.ok(withHistory.startsWith("# Ajustes solicitados — Preset «Home azul» — Home — Site\n"));
+  assert.match(withHistory, /- Página: https:\/\/site\.com\/home\n/);
+  assert.match(withHistory, /- Gerado em: 2026-09-13 10:00\n/);
+  assert.match(withHistory, /- Pedidos a aplicar: 1\n/, "desfeitos guardados por engano não contam nem aparecem");
+  assert.match(withHistory, /## Pedido 1 — «botão azul»/);
+  assert.ok(!withHistory.includes("sumiu"));
+  assert.ok(!withHistory.includes("versão anterior"));
+
+  const legacy = buildPresetReport({
+    name: "Antigo",
+    ops: [
+      { op: "setStyle", selector: "h1", name: "color", value: "#d32f2f", position: "" },
+      { op: "setText", selector: "#cta", name: "", value: "Assinar", position: "" },
+      { op: "remove", selector: "#banner", name: "", value: "", position: "" },
+      { op: "injectCSS", selector: "", name: "", value: ".x{color:red}", position: "" },
+    ],
+  }, { origin: "https://site.com" });
+  assert.ok(legacy.startsWith("# Ajustes solicitados — Preset «Antigo»\n"));
+  assert.match(legacy, /- Página: https:\/\/site\.com\n/, "sem url guardada usa a origem");
+  assert.match(legacy, /## Pedido 1 — «Preset «Antigo»»/);
+  assert.match(legacy, /\*\*Como foi resolvido:\*\* Preset salvo por uma versão anterior da extensão/);
+  assert.match(legacy, /- setStyle em `h1`: `color` "" → "#d32f2f"\n/);
+  assert.match(legacy, /- setText em `#cta`: "" → "Assinar"\n/);
+  assert.match(legacy, /- remove `#banner` — elemento removido:\n```html\n\(HTML não registrado\)\n```/);
+  assert.match(legacy, /- injectCSS — CSS adicionado à página:\n```css\n\.x\{color:red\}\n```/);
+  assert.ok(!legacy.includes("Elemento s1"));
 });
