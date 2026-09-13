@@ -121,3 +121,46 @@ test("handles missing optional fields safely", () => {
     log.modifiedWarning({ activeCount: 1 });
   });
 });
+
+test("null records e null changes não lançam, groupEnd garantido", () => {
+  const c = spyConsole();
+  const log = createLogger(c);
+  assert.doesNotThrow(() => {
+    log.request({
+      n: 1,
+      request: "test",
+      targets: [],
+      provider: "p",
+      model: "m",
+      ms: 10,
+      records: [
+        null,
+        { op: { op: "setText", selector: "p" }, changes: [null, { target: "p", before: "a", after: "b" }, null] },
+        undefined,
+      ],
+    });
+  });
+  // Verify groupEnd was called (last call)
+  assert.equal(c.calls.at(-1)[0], "groupEnd");
+  // Verify no null or undefined leaked into console
+  const text = c.calls.map((x) => x[1]).join("\n");
+  assert.ok(!text.includes("null"));
+  assert.ok(!text.includes("undefined"));
+});
+
+test("record com changes vazio e sem warning loga (sem alterações)", () => {
+  const c = spyConsole();
+  const log = createLogger(c);
+  log.request({
+    n: 1,
+    request: "test",
+    targets: [],
+    provider: "p",
+    model: "m",
+    ms: 10,
+    records: [{ op: { op: "remove", selector: "p" }, changes: [] }],
+  });
+  const text = c.calls.map((x) => x[1]).join("\n");
+  assert.match(text, /✔ remove \(sem alterações\)/);
+  assert.equal(c.calls.at(-1)[0], "groupEnd");
+});
