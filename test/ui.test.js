@@ -104,3 +104,20 @@ test("banner sem presetNames omite a parte do preset", () => {
   assert.match(root.textContent, /deste site \(3 alterações\)\. Não é o site original\./);
   assert.doesNotMatch(root.textContent, /preset/);
 });
+
+test("indicador se reancora: host arrancado do DOM volta no próximo update", () => {
+  const { doc } = makeDoc("<body></body>");
+  const ind = createIndicator(doc, { position: "bottom", onViewOriginal() {}, onEdit() {}, onDisableAuto() {} });
+  ind.update({ activeCount: 2, originalMode: false, presetNames: [], fromPreset: false, autoApplied: false, applied: 2, total: 2 });
+
+  const host = doc.querySelector("aise-indicator");
+  assert.ok(host);
+  assert.equal(host.style.display, "block", "host reforça display inline");
+  host.remove();
+  assert.equal(doc.querySelector("aise-indicator"), null);
+
+  ind.update({ activeCount: 2, originalMode: false, presetNames: [], fromPreset: false, autoApplied: false, applied: 2, total: 2 });
+  const back = doc.querySelector("aise-indicator");
+  assert.ok(back, "host volta ao DOM");
+  assert.match(back.shadowRoot.textContent, /MODIFICADA por você/);
+});

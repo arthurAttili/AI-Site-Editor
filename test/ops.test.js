@@ -114,3 +114,91 @@ test("insertHTML com position inválida retorna warning sem lançar", () => {
   assert.deepEqual(r.changes, []);
   assert.match(r.warning, /inválida/);
 });
+
+test("queryNodes descarta os hosts da extensão: remove aise-indicator não casa nada", () => {
+  const { doc } = makeDoc("<body><p id='a'>a</p></body>");
+  doc.documentElement.appendChild(doc.createElement("aise-indicator"));
+  doc.documentElement.appendChild(doc.createElement("aise-panel"));
+
+  const rec = applyOp({ op: "remove", selector: "aise-indicator", name: "", value: "", position: "" }, doc, {});
+  assert.equal(rec.matched, 0);
+  assert.ok(doc.querySelector("aise-indicator"));
+
+  const rec2 = applyOp({ op: "setStyle", selector: "aise-panel", name: "display", value: "none", position: "" }, doc, {});
+  assert.equal(rec2.matched, 0);
+  assert.equal(doc.querySelector("aise-panel").style.display, "");
+});
+
+test("queryNodes também descarta descendentes de um host aise-*", () => {
+  const { doc } = makeDoc("<body><p id='a'>a</p></body>");
+  const host = doc.createElement("aise-indicator");
+  const inner = doc.createElement("p");
+  host.appendChild(inner);
+  doc.documentElement.appendChild(host);
+
+  const rec = applyOp({ op: "setStyle", selector: "p", name: "color", value: "red", position: "" }, doc, {});
+  assert.equal(rec.matched, 1, "só o <p> da página, não o de dentro do host");
+  assert.equal(doc.getElementById("a").style.color, "red");
+  assert.equal(inner.style.color, "");
+});
+
+test("injectCSS que cita aise- é recusado; o marcador [data-aise-id] continua valendo", () => {
+  const { doc } = makeDoc("<body><p id='a'>a</p></body>");
+
+  const rec = applyOp({ op: "injectCSS", selector: "", name: "", value: "aise-indicator{display:none}", position: "" }, doc, {});
+  assert.equal(rec.matched, 0);
+  assert.match(rec.warning, /bloqueado por segurança/);
+  assert.equal(doc.querySelector("style[data-aise]"), null);
+
+  const rec2 = applyOp(
+    { op: "injectCSS", selector: "", name: "", value: '[data-aise-id="s1"]{color:red}', position: "" },
+    doc,
+    {}
+  );
+  assert.equal(rec2.matched, 1);
+
+  const rec3 = applyOp(
+    { op: "injectCSS", selector: "", name: "", value: '[data-aise-id="s1"], aise-indicator{display:none}', position: "" },
+    doc,
+    {}
+  );
+  assert.equal(rec3.matched, 0);
+});
+
+test("setAttr recusa on*, href javascript: e srcdoc", () => {
+  const { doc } = makeDoc("<body><a id='a' href='https://ok.example/'>a</a></body>");
+  const a = doc.getElementById("a");
+
+  const rec = applyOp({ op: "setAttr", selector: "#a", name: "onclick", value: "alert(1)", position: "" }, doc, {});
+  assert.equal(rec.matched, 0);
+  assert.equal(rec.warning, "atributo bloqueado por segurança: onclick");
+  assert.equal(a.hasAttribute("onclick"), false);
+
+  const rec2 = applyOp({ op: "setAttr", selector: "#a", name: "href", value: "javascript:alert(1)", position: "" }, doc, {});
+  assert.equal(rec2.matched, 0);
+  assert.equal(a.getAttribute("href"), "https://ok.example/");
+
+  const rec3 = applyOp({ op: "setAttr", selector: "#a", name: "srcdoc", value: "<b>x</b>", position: "" }, doc, {});
+  assert.equal(rec3.matched, 0);
+
+  const rec4 = applyOp({ op: "setAttr", selector: "#a", name: "title", value: "ok", position: "" }, doc, {});
+  assert.equal(rec4.matched, 1);
+  assert.equal(a.getAttribute("title"), "ok");
+});
+
+test("setAttr style perigoso e setStyle com expression() são recusados", () => {
+  const { doc } = makeDoc("<body><p id='a'>a</p></body>");
+  const a = doc.getElementById("a");
+
+  const rec = applyOp({ op: "setAttr", selector: "#a", name: "style", value: "width:expression(alert(1))", position: "" }, doc, {});
+  assert.equal(rec.matched, 0);
+
+  const rec2 = applyOp({ op: "setStyle", selector: "#a", name: "background", value: "url(javascript:alert(1))", position: "" }, doc, {});
+  assert.equal(rec2.matched, 0);
+  assert.equal(rec2.warning, "estilo bloqueado por segurança: background");
+  assert.equal(a.style.background, "");
+
+  const rec3 = applyOp({ op: "setStyle", selector: "#a", name: "color", value: "red", position: "" }, doc, {});
+  assert.equal(rec3.matched, 1);
+  assert.equal(a.style.color, "red");
+});
