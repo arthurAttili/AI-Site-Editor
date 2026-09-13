@@ -1,0 +1,255 @@
+/* sidebar.css — visual compacto de DevTools para a página sidebar.html.
+   Sem recursos externos; segue `prefers-color-scheme` porque o painel do
+   DevTools herda o tema (claro/escuro) do próprio DevTools, não do site
+   inspecionado. */
+
+:root {
+  color-scheme: light dark;
+  --aise-bg: #ffffff;
+  --aise-fg: #202124;
+  --aise-fg-muted: #5f6368;
+  --aise-border: rgba(0, 0, 0, 0.14);
+  --aise-surface: rgba(0, 0, 0, 0.04);
+  --aise-surface-hover: rgba(0, 0, 0, 0.08);
+  --aise-accent: #ee8d49;
+  --aise-accent-fg: #1b1b1f;
+  --aise-error-bg: rgba(217, 48, 37, 0.1);
+  --aise-error-fg: #b3261e;
+  --aise-chip-bg: rgba(238, 141, 73, 0.14);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --aise-bg: #202124;
+    --aise-fg: #e8eaed;
+    --aise-fg-muted: #9aa0a6;
+    --aise-border: rgba(255, 255, 255, 0.16);
+    --aise-surface: rgba(255, 255, 255, 0.06);
+    --aise-surface-hover: rgba(255, 255, 255, 0.12);
+    --aise-accent: #ee8d49;
+    --aise-accent-fg: #1b1b1f;
+    --aise-error-bg: rgba(242, 139, 130, 0.16);
+    --aise-error-fg: #f28b82;
+    --aise-chip-bg: rgba(238, 141, 73, 0.2);
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background: var(--aise-bg);
+  color: var(--aise-fg);
+  font: 12px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+#root {
+  padding: 10px;
+}
+
+.aise-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.aise-connection {
+  font-size: 11px;
+  color: var(--aise-fg-muted);
+}
+
+.aise-inspected-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.aise-inspected-label {
+  flex: 1 1 auto;
+  overflow-wrap: anywhere;
+}
+
+.aise-selection-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.aise-chip {
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: var(--aise-chip-bg);
+  border: 1px solid var(--aise-border);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.aise-form {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.aise-form textarea {
+  width: 100%;
+  min-height: 56px;
+  resize: vertical;
+  padding: 6px;
+  border-radius: 4px;
+  border: 1px solid var(--aise-border);
+  background: var(--aise-bg);
+  color: var(--aise-fg);
+  font: inherit;
+}
+
+.aise-form textarea:disabled {
+  opacity: 0.6;
+}
+
+.aise-form button[data-action="send"] {
+  align-self: flex-end;
+}
+
+/* Botões: hover levanta 1px com sombra, active "afunda", foco por teclado
+   ganha anel laranja. Desabilitado nunca reage (:not(:disabled)). */
+.aise-btn {
+  cursor: pointer;
+  border: 1px solid var(--aise-border);
+  background: var(--aise-surface);
+  color: var(--aise-fg);
+  border-radius: 5px;
+  padding: 4px 9px;
+  font: inherit;
+  transition: background-color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease, filter 0.15s ease, transform 0.12s ease, opacity 0.15s ease;
+}
+
+.aise-btn:hover:not(:disabled) {
+  background: var(--aise-surface-hover);
+  border-color: var(--aise-accent);
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.14);
+  transform: translateY(-1px);
+}
+
+.aise-btn:active:not(:disabled) {
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
+  transform: translateY(0) scale(0.98);
+  transition-duration: 0.05s;
+}
+
+.aise-btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--aise-bg), 0 0 0 4px var(--aise-accent);
+}
+
+.aise-btn:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
+.aise-btn-small {
+  padding: 2px 7px;
+  font-size: 11px;
+}
+
+.aise-btn-primary {
+  background: var(--aise-accent);
+  color: var(--aise-accent-fg);
+  border-color: var(--aise-accent);
+  font-weight: 600;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.16);
+}
+
+.aise-btn-primary:hover:not(:disabled) {
+  filter: brightness(1.06);
+  box-shadow: 0 4px 14px rgba(238, 141, 73, 0.45);
+}
+
+.aise-btn-primary:active:not(:disabled) {
+  filter: brightness(0.95);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .aise-btn, .aise-history-entry { transition: none; }
+  .aise-btn:hover:not(:disabled), .aise-btn:active:not(:disabled) { transform: none; }
+}
+
+.aise-busy,
+.aise-error {
+  padding: 4px 7px;
+  border-radius: 4px;
+  font-size: 11px;
+}
+
+.aise-busy {
+  background: var(--aise-surface);
+  color: var(--aise-fg-muted);
+}
+
+.aise-error {
+  background: var(--aise-error-bg);
+  color: var(--aise-error-fg);
+}
+
+.aise-status {
+  font-weight: 600;
+}
+
+.aise-history {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 260px;
+  overflow-y: auto;
+}
+
+.aise-history-entry {
+  border: 1px solid var(--aise-border);
+  border-radius: 4px;
+  padding: 6px 7px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.aise-history-entry:hover {
+  border-color: rgba(238, 141, 73, 0.6);
+  background: var(--aise-surface);
+}
+
+.aise-history-entry-undone {
+  opacity: 0.55;
+  text-decoration: line-through;
+}
+
+.aise-history-head {
+  display: flex;
+  gap: 6px;
+  font-weight: 600;
+}
+
+.aise-history-n {
+  color: var(--aise-accent);
+}
+
+.aise-history-summary {
+  color: var(--aise-fg-muted);
+}
+
+.aise-history-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.aise-footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
