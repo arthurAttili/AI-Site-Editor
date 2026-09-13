@@ -1,0 +1,192 @@
+/* popup.css — visual do popup da toolbar (Task 13). Sem recursos externos;
+   segue `prefers-color-scheme` porque o popup roda fora do site inspecionado
+   e não deve herdar o tema dele. */
+
+:root {
+  color-scheme: light dark;
+  --aise-bg: #ffffff;
+  --aise-fg: #202124;
+  --aise-fg-muted: #5f6368;
+  --aise-border: rgba(0, 0, 0, 0.14);
+  --aise-surface: rgba(0, 0, 0, 0.04);
+  --aise-surface-hover: rgba(0, 0, 0, 0.08);
+  --aise-accent: #ee8d49;
+  --aise-accent-fg: #1b1b1f;
+  --aise-error-bg: rgba(217, 48, 37, 0.1);
+  --aise-error-fg: #b3261e;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --aise-bg: #202124;
+    --aise-fg: #e8eaed;
+    --aise-fg-muted: #9aa0a6;
+    --aise-border: rgba(255, 255, 255, 0.16);
+    --aise-surface: rgba(255, 255, 255, 0.06);
+    --aise-surface-hover: rgba(255, 255, 255, 0.12);
+    --aise-accent: #ee8d49;
+    --aise-accent-fg: #1b1b1f;
+    --aise-error-bg: rgba(242, 139, 130, 0.16);
+    --aise-error-fg: #f28b82;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  width: 340px;
+  background: var(--aise-bg);
+  color: var(--aise-fg);
+  font: 13px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+#root {
+  padding: 12px;
+}
+
+.aise-popup {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.aise-popup-uneditable {
+  padding: 8px 2px;
+  color: var(--aise-fg-muted);
+}
+
+.aise-popup-status {
+  font-weight: 600;
+}
+
+.aise-popup-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.aise-btn {
+  cursor: pointer;
+  border: 1px solid var(--aise-border);
+  background: var(--aise-surface);
+  color: var(--aise-fg);
+  border-radius: 4px;
+  padding: 5px 10px;
+  font: inherit;
+}
+
+.aise-btn:hover:not(:disabled) {
+  background: var(--aise-surface-hover);
+}
+
+.aise-btn:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
+.aise-btn-small {
+  padding: 3px 8px;
+  font-size: 12px;
+}
+
+.aise-popup-error,
+.aise-popup-busy {
+  padding: 5px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+}
+
+.aise-popup-error {
+  background: var(--aise-error-bg);
+  color: var(--aise-error-fg);
+}
+
+.aise-popup-busy {
+  background: var(--aise-surface);
+  color: var(--aise-fg-muted);
+}
+
+.aise-popup-presets {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 260px;
+  overflow-y: auto;
+}
+
+.aise-popup-empty {
+  color: var(--aise-fg-muted);
+  padding: 6px 2px;
+}
+
+.aise-popup-preset {
+  border: 1px solid var(--aise-border);
+  border-radius: 6px;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.aise-popup-preset-info {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.aise-popup-preset-name {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.aise-popup-preset-count {
+  color: var(--aise-fg-muted);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.aise-popup-auto {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--aise-fg-muted);
+  cursor: pointer;
+}
+
+.aise-popup-preset-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.aise-popup-warning {
+  font-size: 11px;
+  color: var(--aise-fg-muted);
+  border-top: 1px solid var(--aise-border);
+  padding-top: 8px;
+}
+
+.aise-popup-footer {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.aise-popup-link {
+  cursor: pointer;
+  border: none;
+  background: transparent;
+  color: var(--aise-accent);
+  font: inherit;
+  font-weight: 600;
+  padding: 2px 0;
+}
+
+.aise-popup-link:hover {
+  text-decoration: underline;
+}
