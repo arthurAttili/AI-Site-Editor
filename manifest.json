@@ -1,9 +1,9 @@
 {
   "manifest_version": 3,
   "name": "aiSiteEditor — editor de sites com IA",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Edite qualquer elemento de qualquer site em linguagem natural, pelo botão direito. Log no Console, sidebar no Elements, presets por site.",
-  "permissions": ["contextMenus", "storage", "activeTab", "tabs", "scripting"],
+  "permissions": ["contextMenus", "storage", "activeTab", "tabs", "scripting", "clipboardWrite"],
   "host_permissions": ["<all_urls>"],
   "background": { "service_worker": "background.js", "type": "module" },
   "content_scripts": [{ "matches": ["<all_urls>"], "js": ["content.js"], "run_at": "document_idle" }],

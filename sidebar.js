@@ -8,6 +8,7 @@
 
 import { createSidebarView } from "./lib/ui/sidebar-view.js";
 import { createPortClient, applyReply, runAction, requestState } from "./lib/port-client.js";
+import { copyText } from "./lib/ui/clipboard.js";
 
 const PORT_NAME = "aise-devtools";
 
@@ -24,6 +25,7 @@ const view = createSidebarView(document, root, {
   onRedoAll,
   onViewOriginal,
   onSavePreset,
+  onCopyLog,
   onOpenOptions,
 });
 
@@ -87,6 +89,27 @@ function onSavePreset() {
   const name = window.prompt("Nome do preset:");
   if (!name) return; // cancelado silenciosamente
   runAction(view, client.send({ type: "SAVE_PRESET", name }));
+}
+
+// Pede o relatório ao content script e copia aqui (a área de transferência
+// é a desta página, não a da aba editada).
+function onCopyLog() {
+  client
+    .send({ type: "GET_REPORT" })
+    .then(async (reply) => {
+      if (!reply || !reply.ok) {
+        view.setError((reply && reply.error) || "Não foi possível gerar o log.");
+        return;
+      }
+      const ok = await copyText(reply.report, { clipboard: navigator.clipboard, doc: document });
+      if (ok) {
+        view.setError(null);
+        view.flashCopyLog("Copiado ✓");
+      } else {
+        view.setError("Não foi possível copiar o log.");
+      }
+    })
+    .catch((err) => view.setError(err.message));
 }
 
 function onOpenOptions() {

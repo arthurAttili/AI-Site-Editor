@@ -47,6 +47,7 @@ Clique em "Salvar" para gravar.
 5. O histórico de pedidos aparece no painel, cada um com um botão **Desfazer**. Os botões **Desfazer tudo** e **Refazer tudo** agem sobre todo o histórico da sessão.
 6. Todo pedido gera um grupo recolhido no Console do DevTools, com o prefixo `[Editor IA] Pedido #N — "texto do pedido"`, mostrando as operações pedidas e as alterações de fato aplicadas (ou o aviso, se alguma operação não encontrou o alvo).
 7. Na aba **Elements** do DevTools existe uma sub-aba **"Editor IA"**: mostra o elemento atualmente inspecionado, tem um botão **"Usar elemento selecionado"** (usa o `$0` do DevTools como alvo) e espelha o mesmo histórico de pedidos da página, com os mesmos botões de desfazer.
+8. Ao final da revisão, clique em **Copiar log** (no rodapé do painel, da janela separada ou da sidebar do DevTools). A extensão copia um relatório em Markdown com tudo o que foi pedido nesta sessão, pronto para colar no Claude Code (ou outra IA) que trabalha no código-fonte/homolog do site. O relatório traz, para cada pedido: o seu texto original, como a IA resolveu, o elemento alvo (seletor estável, caminho de ancestrais e o HTML antes e depois) e cada operação aplicada no DOM, com os valores antigos e novos. Pedidos desfeitos ficam de fora; presets já aplicados na página entram numa seção própria. É o fluxo pensado para reunião com cliente: os ajustes são feitos na hora, ao vivo na página, e depois viram uma única solicitação de código com um copiar e colar.
 
 ## Presets e o aviso de site modificado
 
@@ -121,6 +122,9 @@ Sem build step: JS puro (ES modules), Node 24, testes com `node --test` e `jsdom
 - [ ] Com chave errada: tentar um pedido e conferir a mensagem de erro de autenticação
 - [ ] Clicar em "Desligar auto-aplicar" pelo banner do indicador sem nunca ter aberto o painel nesta sessão, e conferir que o toast de confirmação aparece mesmo assim
 - [ ] Conferir que o histórico de pedidos da sidebar do DevTools espelha corretamente o histórico do painel da página
+- [ ] Sem nenhum pedido na sessão, clicar em "Copiar log" no painel: aparece o toast "Nenhum pedido nesta sessão ainda."
+- [ ] Depois de dois pedidos (um deles desfeito), clicar em "Copiar log" no painel, colar num editor e conferir: cabeçalho com site/página/data, seção "Contexto para quem for aplicar", só o pedido ativo listado (com "1 desfeito(s), omitido(s)"), seletor, caminho, HTML antes/depois e as operações com valores antigos → novos
+- [ ] Clicar em "Copiar log" na janela separada (⧉) e na sidebar do DevTools: o botão vira "Copiado ✓" por um instante e o conteúdo colado é o mesmo do painel
 - [ ] Abrir o popup numa aba que já estava aberta antes de instalar/recarregar a extensão e conferir que o content script é injetado no primeiro uso
 
 ## Licença

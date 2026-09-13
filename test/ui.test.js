@@ -230,3 +230,15 @@ test("arrastar pelo cabeçalho move o painel, limita à viewport e a posição s
   detachBtn.click();
   assert.equal(detached, 1);
 });
+
+test("botão Copiar log do painel chama onCopyLog", () => {
+  const { doc } = makeDoc("<body></body>");
+  let calls = 0;
+  const p = createPanel(doc, { onSubmit() {}, onUndo() {}, onUndoAll() {}, onRedoAll() {}, onSavePreset() {}, onClose() {}, onRemoveSelection() {}, onOpenOptions() {}, onCopyLog: () => calls++ });
+  p.show();
+  const root = doc.querySelector("aise-panel").shadowRoot;
+  const btn = root.querySelector('[data-action="copy-log"]');
+  assert.equal(btn.textContent, "Copiar log");
+  btn.click();
+  assert.equal(calls, 1);
+});

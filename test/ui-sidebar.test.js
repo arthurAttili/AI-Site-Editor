@@ -213,3 +213,31 @@ test("variante padrão (devtools) continua com $0 e textos do DevTools", () => {
   view.setConnection("disconnected");
   assert.match(root.querySelector('[data-role="connection"]').textContent, /reabra o DevTools/);
 });
+
+test("footer: Copiar log chama onCopyLog e flashCopyLog troca o rótulo e restaura depois do timer", () => {
+  const { doc, win } = makeDoc("<body><div id='root'></div></body>");
+  const root = doc.getElementById("root");
+  let calls = 0;
+  const view = createSidebarView(doc, root, { onCopyLog: () => calls++ });
+  const btn = root.querySelector('[data-action="copy-log"]');
+  assert.equal(btn.textContent, "Copiar log");
+  btn.click();
+  assert.equal(calls, 1);
+
+  // controla o timer da janela do jsdom
+  const timers = [];
+  win.setTimeout = (fn, ms) => { timers.push({ fn, ms }); return timers.length; };
+  win.clearTimeout = (id) => { timers[id - 1] = null; };
+
+  view.flashCopyLog("Copiado ✓", 1500);
+  assert.equal(btn.textContent, "Copiado ✓");
+  assert.equal(timers.length, 1);
+  assert.equal(timers[0].ms, 1500);
+
+  view.flashCopyLog("Copiado ✓", 1500); // segundo clique cancela o timer anterior
+  assert.equal(timers[0], null);
+  assert.equal(timers.length, 2);
+
+  timers[1].fn();
+  assert.equal(btn.textContent, "Copiar log");
+});

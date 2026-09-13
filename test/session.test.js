@@ -391,3 +391,71 @@ test("applyPreset no modo original é recusado: não escreve no DOM nem em prese
   assert.equal(a.style.color, "");
   assert.equal(session.activeCount(), 0);
 });
+
+test("addRequest guarda targets (seletor estável, caminho, HTML antes/depois sem data-aise-id) e exportHistory usa ops estáveis", () => {
+  const { doc, win } = makeDoc("<body><main><section class='hero'><p id='a'>oi</p></section></main></body>");
+  const session = makeSession(doc, win);
+  const a = doc.getElementById("a");
+  session.selectOnly(a);
+
+  const ops = [
+    { op: "setStyle", selector: '[data-aise-id="s1"]', name: "color", value: "red", position: "" },
+    { op: "setText", selector: '[data-aise-id="s1"]', name: "", value: "olá", position: "" },
+  ];
+  const entry = session.addRequest({ request: "vermelho e olá", summary: "feito", ops });
+
+  assert.equal(entry.targets.length, 1);
+  const t = entry.targets[0];
+  assert.equal(t.id, "s1");
+  assert.equal(t.selector, "#a");
+  assert.match(t.ancestors, /section\.hero/);
+  assert.equal(t.htmlBefore, '<p id="a">oi</p>');
+  assert.equal(t.htmlAfter, '<p id="a" style="color: red;">olá</p>');
+  assert.ok(!t.htmlBefore.includes("data-aise-id") && !t.htmlAfter.includes("data-aise-id"));
+
+  const exported = session.exportHistory();
+  assert.equal(exported.length, 1);
+  assert.equal(exported[0].n, 1);
+  assert.equal(exported[0].request, "vermelho e olá");
+  assert.equal(exported[0].summary, "feito");
+  assert.equal(exported[0].undone, false);
+  assert.deepEqual(exported[0].targets, [t]);
+  assert.notEqual(exported[0].targets[0], t, "targets são cópias");
+  assert.deepEqual(exported[0].records.map((r) => r.op.selector), ["#a", "#a"], "seletor estável, não o marcador");
+  assert.deepEqual(exported[0].records[0], {
+    op: { op: "setStyle", selector: "#a", name: "color", value: "red", position: "" },
+    matched: 1,
+    warning: null,
+    changes: [{ before: "", after: "red" }],
+  });
+  assert.deepEqual(exported[0].records[1].changes, [{ before: "oi", after: "olá" }]);
+
+  session.undoRequest(entry.id);
+  assert.equal(session.exportHistory()[0].undone, true);
+  assert.deepEqual(session.exportHistory()[0].records.map((r) => r.op.selector), ["#a", "#a"]);
+});
+
+test("exportPresets devolve nome, contagem e records com aviso para seletor ausente", () => {
+  const { doc, win } = makeDoc("<body><p id='a'>oi</p></body>");
+  const session = makeSession(doc, win);
+  session.applyPreset({
+    id: "preset-1",
+    name: "Meu preset",
+    ops: [
+      { op: "setStyle", selector: "#a", name: "color", value: "red", position: "" },
+      { op: "setStyle", selector: "#sumiu", name: "color", value: "blue", position: "" },
+    ],
+  });
+  const presets = session.exportPresets();
+  assert.equal(presets.length, 1);
+  assert.equal(presets[0].name, "Meu preset");
+  assert.equal(presets[0].applied, 1);
+  assert.equal(presets[0].total, 2);
+  assert.equal(presets[0].records.length, 2);
+  assert.equal(presets[0].records[0].matched, 1);
+  assert.equal(presets[0].records[0].op.selector, "#a");
+  assert.deepEqual(presets[0].records[0].changes, [{ before: "", after: "red" }]);
+  assert.equal(presets[0].records[1].matched, 0);
+  assert.equal(typeof presets[0].records[1].warning, "string");
+  assert.equal(session.exportHistory().length, 0, "preset não entra no histórico de pedidos");
+});

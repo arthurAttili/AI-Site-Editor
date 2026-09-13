@@ -160,6 +160,10 @@ async function handleMessage(message) {
     case "SAVE_PRESET":
       await savePresetFlow(message.name);
       return { ok: true, state: currentState() };
+    case "GET_REPORT":
+      // A cópia acontece na página que pediu (janela/sidebar): aqui só o texto.
+      if (session.exportHistory().length === 0) return { ok: false, error: NO_LOG_MSG };
+      return { ok: true, report: buildReportText(), state: currentState() };
     case "APPLY_PRESET":
       await applyPresetById(message.presetId);
       return { ok: true, state: currentState() };
@@ -177,7 +181,7 @@ async function handleMessage(message) {
 
 async function loadLibs() {
   const url = (path) => chrome.runtime.getURL(`lib/${path}`);
-  const [ops, selector, serialize, sanitize, prompt, storage, loggerMod, panelMod, indicatorMod, pickerMod, sessionMod] =
+  const [ops, selector, serialize, sanitize, prompt, storage, loggerMod, panelMod, indicatorMod, pickerMod, sessionMod, report, clipboard] =
     await Promise.all([
       import(url("ops.js")),
       import(url("selector.js")),
@@ -190,6 +194,8 @@ async function loadLibs() {
       import(url("ui/indicator.js")),
       import(url("ui/picker.js")),
       import(url("session.js")),
+      import(url("report.js")),
+      import(url("ui/clipboard.js")),
     ]);
   return {
     ops,
@@ -203,6 +209,8 @@ async function loadLibs() {
     indicator: indicatorMod,
     picker: pickerMod,
     session: sessionMod,
+    report,
+    clipboard,
   };
 }
 
@@ -255,8 +263,35 @@ function ensurePanel() {
       else startPicker();
     },
     onDetach: () => detachEditor(),
+    onCopyLog: () => copyLog(),
   });
   return panel;
+}
+
+// ---------------------------------------------------------------------------
+// Log de handoff — relatório em Markdown com todos os pedidos da sessão,
+// pronto para colar numa IA que trabalha no código-fonte do site.
+// ---------------------------------------------------------------------------
+
+const NO_LOG_MSG = "Nenhum pedido nesta sessão ainda.";
+
+function buildReportText() {
+  return libs.report.buildReport({
+    ...currentMeta(),
+    generatedAt: new Date(),
+    history: session.exportHistory(),
+    presets: session.exportPresets(),
+  });
+}
+
+async function copyLog() {
+  const p = ensurePanel();
+  if (session.exportHistory().length === 0) {
+    p.toast(NO_LOG_MSG);
+    return;
+  }
+  const ok = await libs.clipboard.copyText(buildReportText(), { clipboard: navigator.clipboard, doc: document });
+  p.toast(ok ? "Log copiado — cole no Claude Code." : "Não foi possível copiar o log.");
 }
 
 // Destaca o editor para uma janela separada: esconde o painel (sem limpar a
