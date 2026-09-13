@@ -18,7 +18,7 @@ agressivas) além de um botão "Reaplicar".
 
 | Decisão | Escolha |
 |---|---|
-| Provedor de IA | Claude **e** Gemini, selecionável nas opções |
+| Provedor de IA | Claude, Gemini, OpenAI e qualquer API compatível com OpenAI (OpenRouter, Groq, DeepSeek, Mistral, xAI, Together, Ollama, LM Studio…), selecionável nas opções |
 | Onde digitar o pedido | Painel flutuante na página **e** sidebar "Editor IA" na aba Elements |
 | Persistência | Presets por site; auto-aplicar no reload é **opcional e desligado por padrão** |
 | Aviso de site modificado | Obrigatório e permanente enquanto houver alteração ativa (banner/pílula, badge no ícone, aviso no Console) |
@@ -71,8 +71,10 @@ aiSiteEditor/
     serialize.js         # elemento → contexto enxuto para o prompt
     sanitize.js          # remove <script>, on*= e javascript: de HTML vindo da IA
     prompt.js            # system prompt, mensagem do usuário e JSON Schema das operações
+    providers/index.js   # registro de provedores e catálogo de atalhos (URL base + modelo padrão)
     providers/claude.js  # monta a requisição e interpreta a resposta da Anthropic
     providers/gemini.js  # idem para o Gemini
+    providers/openai.js  # OpenAI e qualquer endpoint compatível (chat/completions)
     storage.js           # settings e presets em chrome.storage.local
     logger.js            # formatação dos grupos no Console
     ui/panel.js          # painel flutuante (Shadow DOM)
@@ -125,9 +127,14 @@ Regras no system prompt: um `setStyle` por propriedade; usar `[data-aise-id]` pa
 Por elemento selecionado: marcador `sN`, tag, seletor estável, `outerHTML` com filhos além da profundidade 3 colapsados e limite de 4.000 caracteres, subconjunto de estilos computados (display, position, color, background-color, font-size, font-family, font-weight, padding, margin, width, height, border, border-radius) e a cadeia de ancestrais (tag + id/classes) até 5 níveis. Mais: URL, título, os últimos 10 pedidos da sessão com seus `summary`. Nada de cookies, formulários preenchidos ou texto fora dos elementos selecionados e seus ancestrais.
 
 ### 4.6 Provedores
+Todos implementam a mesma interface pura: `buildRequest(settings, {system, messages, schema}) → {url, headers, body}` e `parseResponse(json) → {summary, ops, model}`. O `fetch` fica no background.
+
 - **Claude**: `POST https://api.anthropic.com/v1/messages`, cabeçalhos `x-api-key`, `anthropic-version: 2023-06-01`, `anthropic-dangerous-direct-browser-access: true`, `anthropic-beta: server-side-fallback-2026-07-01`. Corpo: `model` (padrão `claude-opus-5`), `max_tokens: 16000`, `fallbacks: "default"`, `system`, `messages`, `output_config.format = {type:"json_schema", schema}`. Verificar `stop_reason` (`refusal` vira erro legível) antes de ler `content[0].text`.
 - **Gemini**: `POST https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key=…` (padrão `gemini-3.7-flash`, o mesmo do yt-transcriptor), `systemInstruction`, `generationConfig: {responseMimeType:"application/json", responseSchema}`.
-- Opções têm botão **Testar conexão** por provedor.
+- **OpenAI**: `POST https://api.openai.com/v1/chat/completions`, `Authorization: Bearer`, `response_format: {type:"json_schema", json_schema:{name, schema, strict:true}}`. Modelo padrão configurável nas opções (campo livre, sem lista fixa).
+- **Compatível com OpenAI**: mesmo módulo do OpenAI com `baseUrl` livre. As opções trazem atalhos que preenchem URL base e modelo sugerido: OpenRouter (`https://openrouter.ai/api/v1`), Groq (`https://api.groq.com/openai/v1`), DeepSeek (`https://api.deepseek.com/v1`), Mistral (`https://api.mistral.ai/v1`), xAI (`https://api.x.ai/v1`), Together (`https://api.together.xyz/v1`), Ollama (`http://localhost:11434/v1`, sem chave), LM Studio (`http://localhost:1234/v1`, sem chave). Se o servidor rejeitar `response_format` com `json_schema`, o módulo tenta de novo com `{type:"json_object"}` e por fim sem `response_format`, sempre validando o JSON localmente.
+- O `manifest.json` declara `host_permissions` para os provedores hospedados e `http://localhost/*`; uma URL base fora dessa lista pede permissão em tempo de execução via `chrome.permissions.request` na tela de opções.
+- Opções têm botão **Testar conexão** e, quando o provedor expõe `GET /models`, botão **Listar modelos**.
 
 ### 4.7 Mensagens (runtime)
 | Mensagem | De → Para | Conteúdo |
@@ -142,7 +149,9 @@ Por elemento selecionado: marcador `sN`, tag, seletor estável, `outerHTML` com 
 
 ### 4.8 Armazenamento (`chrome.storage.local`)
 ```
-settings: { provider, claudeKey, claudeModel, geminiKey, geminiModel, language, indicatorPosition }
+settings: { provider, language, indicatorPosition,
+            providers: { claude:{apiKey,model}, gemini:{apiKey,model}, openai:{apiKey,model},
+                         compat:{baseUrl,apiKey,model,presetId} } }
 presets:  { [origin]: [ { id, name, ops, autoApply, createdAt, updatedAt } ] }
 ```
 Chaves nunca saem do storage local; o repositório público não contém segredo algum.
@@ -173,7 +182,7 @@ Desfazer, aplicação de preset e erros do provedor também entram como grupos p
 - README declara o que é enviado ao provedor (trecho de HTML dos elementos selecionados, URL e título).
 
 ## 8. Testes
-- `npm test` (`node --test`, jsdom): ops (aplicar/desfazer cada tipo, seletor sem match), selector (id único, classes, nth-of-type, estabilidade após remoção de irmão), sanitize, serialize (limites de profundidade e tamanho), prompt (schema válido, contexto de sessão), providers (requisição montada e parse de resposta, inclusive `refusal` e JSON com lixo em volta), storage (troca de marcador por seletor estável ao salvar).
+- `npm test` (`node --test`, jsdom): ops (aplicar/desfazer cada tipo, seletor sem match), selector (id único, classes, nth-of-type, estabilidade após remoção de irmão), sanitize, serialize (limites de profundidade e tamanho), prompt (schema válido, contexto de sessão), providers (requisição montada por provedor, parse de resposta, `refusal` no Claude, fallback de `response_format` no compatível, JSON com lixo em volta), storage (troca de marcador por seletor estável ao salvar).
 - Checklist manual no README: carregar descompactada, botão direito em example.com, editar 2 elementos com Shift, desfazer, ver Console, sidebar no Elements com `$0`, salvar preset, ligar auto-aplicar, recarregar e conferir banner + badge + warn, "Ver original", desligar auto-aplicar.
 
 ## 9. Alternativas descartadas
