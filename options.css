@@ -1,0 +1,180 @@
+/* options.css — visual da página de Opções (Task 14). Sem recursos
+   externos; segue `prefers-color-scheme` porque a página roda fora do site
+   inspecionado, nos mesmos moldes de popup.css. */
+
+:root {
+  color-scheme: light dark;
+  --aise-bg: #ffffff;
+  --aise-fg: #202124;
+  --aise-fg-muted: #5f6368;
+  --aise-border: rgba(0, 0, 0, 0.14);
+  --aise-surface: rgba(0, 0, 0, 0.04);
+  --aise-surface-hover: rgba(0, 0, 0, 0.08);
+  --aise-accent: #ee8d49;
+  --aise-accent-fg: #1b1b1f;
+  --aise-error-bg: rgba(217, 48, 37, 0.1);
+  --aise-error-fg: #b3261e;
+  --aise-ok-fg: #1e8e3e;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --aise-bg: #202124;
+    --aise-fg: #e8eaed;
+    --aise-fg-muted: #9aa0a6;
+    --aise-border: rgba(255, 255, 255, 0.16);
+    --aise-surface: rgba(255, 255, 255, 0.06);
+    --aise-surface-hover: rgba(255, 255, 255, 0.12);
+    --aise-accent: #ee8d49;
+    --aise-accent-fg: #1b1b1f;
+    --aise-error-bg: rgba(242, 139, 130, 0.16);
+    --aise-error-fg: #f28b82;
+    --aise-ok-fg: #81c995;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background: var(--aise-bg);
+  color: var(--aise-fg);
+  font: 14px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+#root {
+  display: flex;
+  justify-content: center;
+  padding: 32px 16px 80px;
+}
+
+.aise-options {
+  width: 100%;
+  max-width: 640px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.aise-options-title {
+  font-size: 20px;
+  margin: 0 0 4px;
+}
+
+.aise-provider-section {
+  border: 1px solid var(--aise-border);
+  border-radius: 8px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.aise-provider-section h2 {
+  margin: 0;
+  font-size: 15px;
+}
+
+.aise-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.aise-field label {
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--aise-fg-muted);
+}
+
+.aise-field input[type="text"],
+.aise-field input[type="password"],
+.aise-field select {
+  font: inherit;
+  padding: 8px 10px;
+  border: 1px solid var(--aise-border);
+  border-radius: 6px;
+  background: var(--aise-surface);
+  color: var(--aise-fg);
+  width: 100%;
+}
+
+.aise-key-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.aise-key-row input {
+  flex: 1;
+}
+
+.aise-nokey {
+  font-size: 12px;
+  color: var(--aise-fg-muted);
+  white-space: nowrap;
+}
+
+.aise-btn {
+  cursor: pointer;
+  border: 1px solid var(--aise-border);
+  background: var(--aise-surface);
+  color: var(--aise-fg);
+  border-radius: 6px;
+  padding: 7px 14px;
+  font: inherit;
+}
+
+.aise-btn:hover:not(:disabled) {
+  background: var(--aise-surface-hover);
+}
+
+.aise-btn:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
+.aise-btn-primary {
+  border-color: var(--aise-accent);
+  background: var(--aise-accent);
+  color: var(--aise-accent-fg);
+  font-weight: 600;
+}
+
+.aise-btn-primary:hover:not(:disabled) {
+  filter: brightness(1.05);
+}
+
+.aise-test-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.aise-test-result {
+  font-size: 13px;
+  color: var(--aise-fg-muted);
+}
+
+.aise-save-row {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.aise-toast {
+  position: fixed;
+  left: 50%;
+  bottom: 24px;
+  transform: translateX(-50%);
+  background: var(--aise-accent);
+  color: var(--aise-accent-fg);
+  padding: 10px 18px;
+  border-radius: 6px;
+  font-weight: 600;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+}
