@@ -227,3 +227,21 @@ test("showToast exibe a mensagem", () => {
   assert.equal(toast.hidden, false);
   assert.equal(toast.textContent, "Opções salvas.");
 });
+
+test("trocar de provedor limpa o resultado do teste anterior", () => {
+  const { doc, win } = makeDoc("<body><div id='root'></div></body>");
+  const root = doc.getElementById("root");
+  const view = createOptionsView(doc, root, {});
+
+  view.setTestResult({ ok: true, model: "claude-opus-5" });
+  const results = Array.from(root.querySelectorAll('[data-role="test-result"]'));
+  assert.ok(results.some((el) => el.textContent !== ""));
+
+  const select = root.querySelector('[data-field="provider"]');
+  select.value = "gemini";
+  select.dispatchEvent(new win.Event("change", { bubbles: true }));
+
+  for (const el of root.querySelectorAll('[data-role="test-result"]')) {
+    assert.equal(el.textContent, "", "resultado do provedor anterior não pode sobreviver à troca");
+  }
+});

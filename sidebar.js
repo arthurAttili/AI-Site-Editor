@@ -41,7 +41,14 @@ let reconnectDelay = RECONNECT_DELAY_MS_INITIAL;
 
 function connectPort() {
   port = chrome.runtime.connect({ name: PORT_NAME });
-  port.postMessage({ type: "INIT", tabId: chrome.devtools.inspectedWindow.tabId });
+  // O service worker pode ter sido descarregado entre o connect e o INIT: aí
+  // o postMessage lança "Attempting to use a disconnected port object" e
+  // derrubaria o boot inteiro do painel. onDisconnect reagenda a reconexão.
+  try {
+    port.postMessage({ type: "INIT", tabId: chrome.devtools.inspectedWindow.tabId });
+  } catch (err) {
+    view.setError("Conexão com a extensão caiu; tentando de novo…");
+  }
   port.onMessage.addListener(onPortMessage);
   port.onDisconnect.addListener(onPortDisconnect);
   reconnectDelay = RECONNECT_DELAY_MS_INITIAL;
@@ -153,7 +160,10 @@ function onSend(text) {
 
 function onUseSelected() {
   chrome.devtools.inspectedWindow.eval(MARK_SELECTED_EVAL, (_result, exceptionInfo) => {
-    if (exceptionInfo) {
+    // Dois canais de erro distintos: `lastError` (a chamada nem chegou à
+    // página — aba fechada, contexto invalidado) e `exceptionInfo` (o eval
+    // rodou e falhou, ou foi recusado pela política da página).
+    if (chrome.runtime.lastError || exceptionInfo) {
       view.setError("Não foi possível usar o elemento selecionado.");
       return;
     }
@@ -194,7 +204,7 @@ function onOpenOptions() {
 
 function updateInspectedLabel() {
   chrome.devtools.inspectedWindow.eval(INSPECTED_LABEL_EVAL, (result, exceptionInfo) => {
-    if (exceptionInfo || !result) {
+    if (chrome.runtime.lastError || exceptionInfo || !result) {
       view.setInspected("");
       return;
     }
