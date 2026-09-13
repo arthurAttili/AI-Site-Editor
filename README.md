@@ -8,12 +8,11 @@ Clique com o botão direito em qualquer elemento de qualquer página, escreva o 
 
 ## Instalação
 
-1. `npm install`
-2. Abra `chrome://extensions`
-3. Ligue "Modo do desenvolvedor" (canto superior direito)
-4. Clique em "Carregar sem compactação" e escolha a pasta deste repositório
+1. Abra `chrome://extensions`
+2. Ligue "Modo do desenvolvedor" (canto superior direito)
+3. Clique em "Carregar sem compactação" e escolha a pasta deste repositório
 
-Não há build step — é JS puro, carregado direto.
+Não há build step — é JS puro, carregado direto. As dependências do `npm` são só para rodar os testes (ver Desenvolvimento).
 
 ## Configurar o provedor de IA
 
@@ -61,18 +60,24 @@ Esse aviso **não pode ser desligado** enquanto há alterações ativas — dá 
 
 ## Privacidade
 
-O que é enviado ao provedor de IA escolhido, a cada pedido:
-- o texto do seu pedido
-- uma serialização enxuta do HTML dos elementos selecionados (`outerHTML` com profundidade e tamanho limitados — ver `lib/serialize.js`)
-- um resumo curto do histórico de pedidos anteriores da sessão, para dar contexto
+O que é enviado ao provedor de IA escolhido, a cada pedido (montado em `lib/prompt.js` a partir de `lib/serialize.js`):
 
-Nada mais da página é enviado. As chaves de API ficam apenas em `chrome.storage.local`, no seu computador, e são usadas exclusivamente para chamar o endpoint do provedor escolhido — a extensão não tem servidor próprio nem telemetria.
+- **o texto do seu pedido**;
+- **a URL e o título da página** — a URL completa, com caminho e query string;
+- **para cada elemento selecionado**: o seletor CSS estável, um rótulo curto, a cadeia de até 5 ancestrais (ex.: `body > div.wrap > nav`) e um resumo dos estilos computados (`display`, `position`, `color`, `background-color`, `font-size`, `font-family`, `font-weight`, `padding`, `margin`, `width`, `height`, `border`, `border-radius`);
+- **um trecho do HTML de cada elemento selecionado**: o `outerHTML` com os descendentes além do 3º nível colapsados em `…` e corte em 4000 caracteres;
+- **o histórico da sessão**: os últimos 10 pedidos desta aba, cada um com o texto do pedido e o resumo do resultado.
+
+Nenhum outro pedaço da página é lido ou transmitido: nada fora dos elementos que você selecionou, nem cookies, nem `localStorage`, nem formulários. Mas atenção ao que **está** dentro do que você seleciona — se o elemento selecionado contiver dados pessoais, eles vão junto no HTML. A URL também vai inteira, então evite editar páginas cuja query string carregue token ou identificador.
+
+As chaves de API ficam apenas em `chrome.storage.local`, no seu computador, e são usadas exclusivamente para chamar o endpoint do provedor escolhido — a extensão não tem servidor próprio nem telemetria.
 
 ## Limitações
 
 - **SPAs que re-renderizam** podem perder as alterações aplicadas quando o framework substitui o DOM — nesse caso é preciso reaplicar o pedido (ou o preset).
 - **Presets dependem de seletores CSS**, que podem parar de bater se o site mudar sua marcação; quando isso acontece, o Console mostra quantas operações do preset foram de fato aplicadas (ex.: "aplicado: 3/5 operações") e avisa quais seletores não foram encontrados.
-- **Páginas onde extensões não podem rodar** (`chrome://`, a Chrome Web Store, o visualizador de PDF do Chrome) mostram "Esta página não pode ser editada" no popup, e o menu de contexto não abre o editor nelas.
+- **Páginas fora de `http(s)`** (`chrome://`, `file://`, `chrome-extension://`, a Chrome Web Store) mostram "Esta página não pode ser editada" no popup, e o menu de contexto não abre o editor nelas.
+- **Documentos que não são HTML** — PDF no visualizador do Chrome, imagem aberta direto, XML — estão numa URL `http(s)` normal, então o popup **não** mostra "Esta página não pode ser editada": o content script simplesmente não se instala neles e o popup mostra "Extensão não carregada nesta aba".
 - **A sidebar do DevTools** precisa que o content script já esteja carregado na aba — em abas abertas antes de instalar/recarregar a extensão, a primeira ação (menu de contexto ou abrir o popup) injeta o script automaticamente.
 
 ## Desenvolvimento
@@ -81,6 +86,8 @@ Nada mais da página é enviado. As chaves de API ficam apenas em `chrome.storag
 npm install
 npm test
 ```
+
+`npm install` só é necessário aqui: instala `jsdom` e mais nada que a extensão carregue em tempo de execução.
 
 Sem build step: JS puro (ES modules), Node 24, testes com `node --test` e `jsdom`. Para testar mudanças na extensão em si, carregue-a sem compactação (ver Instalação) e recarregue a extensão em `chrome://extensions` a cada alteração de código.
 
