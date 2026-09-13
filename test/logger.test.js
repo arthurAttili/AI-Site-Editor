@@ -5,7 +5,7 @@ import { createLogger } from "../lib/logger.js";
 function spyConsole() {
   const calls = [];
   const f = (name) => (...a) => calls.push([name, a.map(String).join(" ")]);
-  return { calls, group: f("group"), groupEnd: f("groupEnd"), log: f("log"), warn: f("warn"), error: f("error") };
+  return { calls, group: f("group"), groupEnd: f("groupEnd"), log: f("log"), info: f("info"), warn: f("warn"), error: f("error") };
 }
 
 test("request loga grupo com alvos, provedor e mudanças", () => {
@@ -60,10 +60,10 @@ test("request sem ms não duplica separador", () => {
   assert.equal(c.calls.at(-1)[0], "groupEnd");
 });
 
-test("modifiedWarning usa console.warn", () => {
+test("modifiedWarning usa console.info (warn iria parar na aba Erros de chrome://extensions)", () => {
   const c = spyConsole();
   createLogger(c).modifiedWarning({ activeCount: 4, presetNames: ["X"] });
-  assert.equal(c.calls[0][0], "warn");
+  assert.equal(c.calls[0][0], "info");
   assert.match(c.calls[0][1], /MODIFICADO por você/);
 });
 

@@ -58,7 +58,7 @@ Quando um preset com auto-aplicar está ativo, a página muda assim que carrega,
 
 - Um banner (ou pílula, depois de "Minimizar") aparece na tela avisando: "⚠ Você está vendo uma versão MODIFICADA por você deste site — preset '...' (N alterações). Não é o site original."
 - O badge da extensão na toolbar mostra **MOD** (vermelho)
-- O Console registra um aviso (`console.warn`) de que a página está modificada
+- O Console registra um aviso (`console.info`) de que a página está modificada — é `info`, e não `warn`, de propósito: o Chrome lista todo `console.warn` de content scripts na aba "Erros" de `chrome://extensions`, e este aviso apareceria lá como se fosse uma falha
 - O banner oferece **"Ver original"** (reverte visualmente as alterações e troca o badge para **ORIG**, cinza) e **"Desligar auto-aplicar"** (some as alterações desse preset a partir do próximo carregamento)
 
 Esse aviso **não pode ser desligado** enquanto há alterações ativas — dá para minimizá-lo numa pílula pequena, mas nunca escondê-lo por completo. Isso é proposital: o objetivo é que você nunca confunda uma versão do site modificada por você com o site de verdade.
