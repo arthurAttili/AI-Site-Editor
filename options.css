@@ -214,6 +214,7 @@ select option {
   position: fixed;
   left: 50%;
   bottom: 24px;
+  pointer-events: none;
   transform: translateX(-50%);
   background: var(--aise-accent);
   color: var(--aise-accent-fg);

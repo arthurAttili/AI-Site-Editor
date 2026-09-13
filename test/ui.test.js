@@ -272,3 +272,18 @@ test("teclas digitadas no painel não vazam para os atalhos da página (YouTube:
   assert.equal(sent, "pedido", "Ctrl+Enter ainda envia");
   assert.deepEqual(seen, [], "nem Esc nem Ctrl+Enter vazam para a página");
 });
+
+test("toast do painel não bloqueia os botões do rodapé e caixas hidden não ocupam espaço", async () => {
+  const { BASE_CSS, PANEL_CSS } = await import("../lib/ui/styles.js");
+  const toastBlock = PANEL_CSS.match(/\.aise-panel-toast\s*\{([^}]*)\}/);
+  assert.ok(toastBlock, "regra .aise-panel-toast existe");
+  assert.match(toastBlock[1], /pointer-events:\s*none/, "o toast deixa o clique passar para Salvar preset / Copiar log");
+  assert.match(BASE_CSS, /\[hidden\]\s*\{\s*display:\s*none\s*!important/, "hidden vence qualquer display: das classes");
+  const { doc } = makeDoc("<body></body>");
+  const p = createPanel(doc, { onSubmit() {}, onClose() {} });
+  p.show();
+  const shadow = doc.querySelector("aise-panel").shadowRoot;
+  assert.equal(shadow.querySelector('[data-role="toast"]').hidden, true, "toast nasce escondido");
+  assert.equal(shadow.querySelector('[data-role="busy"]').hidden, true);
+  assert.equal(shadow.querySelector('[data-role="error"]').hidden, true);
+});

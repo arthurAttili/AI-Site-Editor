@@ -136,6 +136,7 @@ Sem build step: JS puro (ES modules), Node 24, testes com `node --test` e `jsdom
 - [ ] Abrir o popup numa aba `chrome://` ou na loja do Chrome: "Extensão não carregada nesta aba" aparece com o motivo e o botão "Tentar de novo"; numa aba normal recém-recarregada o status passa de "Conectando à página…" para o estado da aba sem precisar clicar em nada
 - [ ] Numa aba com a página respondendo, os botões "Ver original" e "Desfazer tudo" só habilitam depois do primeiro pedido aplicado
 - [ ] Passar o mouse sobre os botões do painel, do popup, da janela separada, da sidebar e das Opções: cada botão levanta com sombra e o primário fica mais claro; ao clicar ele "afunda"; botões desabilitados não reagem; Tab pelo teclado mostra o anel laranja de foco
+- [ ] Logo depois de "Copiar log" ou "Salvar preset" (enquanto o toast ainda está sobre o rodapé), clicar em "Salvar preset deste site": o clique passa pelo toast e o prompt do nome abre
 - [ ] Num vídeo do YouTube, abrir o painel e digitar "k", "j", "f" e "m" na caixa de texto: as letras aparecem e o vídeo não pausa nem muda de volume/tela cheia; Esc ainda fecha o painel e Ctrl+Enter ainda envia
 - [ ] No popup, clicar em "Copiar log" de um preset salvo nesta versão: o botão vira "Copiado ✓" e o conteúdo colado traz os pedidos que geraram o preset (com HTML antes/depois); num preset salvo por uma versão anterior, o relatório lista só as operações e avisa que o histórico não foi registrado
 
