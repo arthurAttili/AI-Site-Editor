@@ -80,6 +80,23 @@ test("callProvider: fetch rejeitando mapeia para kind network", async () => {
   );
 });
 
+test("callProvider: timeout do AbortController mapeia para kind network com mensagem de tempo esgotado", async () => {
+  // fetch fake que nunca resolve sozinho — só rejeita quando o `signal` do
+  // AbortController dispara, simulando um provedor que nunca responde.
+  const fetchImpl = (url, opts) =>
+    new Promise((resolve, reject) => {
+      opts.signal.addEventListener("abort", () => {
+        const err = new Error("The operation was aborted");
+        err.name = "AbortError";
+        reject(err);
+      });
+    });
+  await assert.rejects(
+    () => callProvider(claudeSettings(), prompt, { fetch: fetchImpl, timeoutMs: 20 }),
+    (err) => err instanceof ProviderError && err.kind === "network" && /tempo esgotado/i.test(err.message)
+  );
+});
+
 test("callProvider: sem chave retorna kind no-key sem chamar fetch", async () => {
   let calls = 0;
   const fetchImpl = async () => {

@@ -86,6 +86,9 @@ chrome.runtime.onConnect.addListener((port) => {
   port.onMessage.addListener((msg) => {
     if (!msg) return;
     if (msg.type === "INIT") {
+      // Um segundo INIT (ex.: DevTools trocou de página inspecionada) não pode
+      // deixar a porta registrada sob o tabId antigo.
+      if (tabId != null) unregisterDevtoolsPort(tabId, port);
       tabId = msg.tabId;
       registerDevtoolsPort(tabId, port);
       return;
@@ -157,8 +160,10 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
 // ---------------------------------------------------------------------------
 
 async function handleAiRequest(message) {
-  const settings = await getSettings(chrome.storage.local);
   try {
+    // `getSettings` mora dentro do try: se o storage falhar, a resposta ainda
+    // precisa do contrato {ok:false, error, kind} — nunca só {ok:false, error}.
+    const settings = await getSettings(chrome.storage.local);
     const result = await callProvider(settings, { system: message.system, user: message.user, schema: message.schema }, { fetch });
     return { ok: true, ...result };
   } catch (err) {
