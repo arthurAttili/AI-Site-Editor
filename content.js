@@ -26,6 +26,10 @@ let lastTarget = null;
 let session = null;
 let panel = null;
 let picker = null;
+// Editor "destacado": a janela separada (editor.html) está aberta para esta
+// aba. O painel flutuante fica escondido e a seleção/histórico são espelhados
+// na janela via STATE_CHANGED.
+let detached = false;
 let indicator = null;
 let logger = null;
 let settings = null;
@@ -44,18 +48,20 @@ const ready = new Promise((resolve) => {
 // menu de contexto do Chrome não informa qual elemento foi clicado.
 document.addEventListener("contextmenu", (e) => { lastTarget = e.target; }, true);
 
-// Step 3: Shift+clique alterna seleção enquanto o painel estiver aberto.
-// Registrado desde já (fora do IIFE assíncrono) — `panel` começa null e o
-// guard abaixo o ignora até o painel existir e estar aberto.
+// Step 3: Shift+clique alterna seleção enquanto o painel estiver aberto (ou
+// o editor estiver destacado numa janela separada). Registrado desde já
+// (fora do IIFE assíncrono) — `panel` começa null e o guard abaixo o ignora
+// até o painel existir e estar aberto.
 document.addEventListener(
   "click",
   (e) => {
-    if (!panel || !panel.isOpen() || !e.shiftKey) return;
+    if (!panel || !(panel.isOpen() || detached) || !e.shiftKey) return;
     if (picker && picker.isActive()) return; // o picker já trata o clique
     if (isAiseHostTarget(e.target)) return;
     e.preventDefault();
     session.toggle(e.target);
     syncSelectionUi();
+    if (detached) refresh();
   },
   true
 );
@@ -93,6 +99,21 @@ async function handleMessage(message) {
       // liga a mira, como o inspetor do F12 — um clique troca o alvo.
       openEditorFor(lastTarget || document.body);
       startPicker();
+      return { ok: true, state: currentState() };
+    case "DETACH_EDITOR":
+      await detachEditor();
+      return { ok: true, state: currentState() };
+    case "DOCK_EDITOR":
+      dockEditor();
+      return { ok: true, state: currentState() };
+    case "EDITOR_WINDOW_CLOSED":
+      // Fechar a janela separada equivale a fechar o editor. Se já voltamos
+      // ao modo painel (DOCK_EDITOR), o aviso é tardio e não pode fechar o
+      // painel recém-reaberto.
+      if (detached) {
+        detached = false;
+        closePanel();
+      }
       return { ok: true, state: currentState() };
     case "START_PICKER":
       startPicker();
@@ -212,7 +233,7 @@ function currentMeta() {
 }
 
 function currentState() {
-  return session.publicState(currentMeta());
+  return { ...session.publicState(currentMeta()), picking: !!(picker && picker.isActive()), detached };
 }
 
 function ensurePanel() {
@@ -233,8 +254,45 @@ function ensurePanel() {
       if (picker && picker.isActive()) stopPicker();
       else startPicker();
     },
+    onDetach: () => detachEditor(),
   });
   return panel;
+}
+
+// Destaca o editor para uma janela separada: esconde o painel (sem limpar a
+// seleção — ela continua destacada na página e aparece na janela) e pede ao
+// background para abrir/focar a janela.
+async function detachEditor() {
+  stopPicker();
+  if (panel) panel.hide();
+  detached = true;
+  const reply = await sendToBackground({ type: "OPEN_EDITOR_WINDOW" });
+  if (!reply || !reply.ok) {
+    detached = false;
+    if (panel && session.getSelection().length) {
+      panel.show();
+      panel.setError((reply && reply.error) || "Não foi possível abrir a janela separada.");
+    }
+    return;
+  }
+  refresh();
+}
+
+// Volta o editor para dentro da página (a janela se fecha sozinha).
+function dockEditor() {
+  detached = false;
+  sendToBackground({ type: "CLOSE_EDITOR_WINDOW" });
+  ensurePanel();
+  syncSelectionUi();
+  panel.setError(null);
+  panel.show();
+  panel.focus();
+  refresh();
+}
+
+// Traz a janela separada para frente (após escolher um elemento na página).
+function focusEditorWindow() {
+  if (detached) sendToBackground({ type: "OPEN_EDITOR_WINDOW" });
 }
 
 // ---------------------------------------------------------------------------
@@ -248,20 +306,23 @@ function ensurePicker() {
     onPick: (el, { additive }) => {
       if (additive) {
         ensurePanel();
-        if (!panel.isOpen()) {
+        if (!detached && !panel.isOpen()) {
           openEditorFor(el);
         } else {
           session.toggle(el);
           injectHighlightStyle();
           syncSelectionUi();
+          refresh();
         }
         return;
       }
       openEditorFor(el);
       panel.setPicking(false);
+      focusEditorWindow();
     },
     onCancel: () => {
       if (panel) panel.setPicking(false);
+      if (detached) refresh();
     },
   });
   return picker;
@@ -270,11 +331,14 @@ function ensurePicker() {
 function startPicker() {
   ensurePicker().start();
   if (panel) panel.setPicking(true);
+  if (detached) refresh();
 }
 
 function stopPicker() {
+  const wasActive = !!(picker && picker.isActive());
   if (picker) picker.stop();
   if (panel) panel.setPicking(false);
+  if (detached && wasActive) refresh();
 }
 
 function syncSelectionUi() {
@@ -288,6 +352,11 @@ function openEditorFor(el) {
   ensurePanel();
   syncSelectionUi();
   panel.setError(null);
+  if (detached) {
+    // A janela separada é quem mostra a seleção; o painel continua escondido.
+    refresh();
+    return;
+  }
   const rect = typeof el.getBoundingClientRect === "function" ? el.getBoundingClientRect() : undefined;
   panel.show(rect);
   panel.focus();
@@ -298,6 +367,7 @@ function closePanel() {
   if (panel) panel.hide();
   session.clear();
   removeHighlightStyle();
+  refresh();
 }
 
 // ---------------------------------------------------------------------------
@@ -595,9 +665,17 @@ async function init() {
   indicator = libs.indicator.createIndicator(document, {
     position: settings.indicatorPosition,
     onViewOriginal: () => doToggleOriginal(),
-    onEdit: () => openEditorFor(lastTarget || document.body),
+    onEdit: () => {
+      openEditorFor(lastTarget || document.body);
+      focusEditorWindow();
+    },
     onDisableAuto: () => disableAutoFlow(),
   });
+
+  // Página recarregada com a janela separada ainda aberta: continua no modo
+  // destacado em vez de voltar a mostrar o painel na página.
+  const status = await sendToBackground({ type: "EDITOR_WINDOW_STATUS" });
+  if (status && status.ok && status.open) detached = true;
 
   await autoApplyPresets();
   refresh();

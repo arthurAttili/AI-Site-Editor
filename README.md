@@ -41,6 +41,8 @@ Clique em "Salvar" para gravar.
 1. Clique com o botão direito em qualquer elemento da página e escolha **"Editar com IA"** — o painel flutuante abre com aquele elemento já selecionado e o ponteiro vira uma **mira**, como o inspetor do DevTools (F12): o elemento sob o mouse ganha um contorno laranja com o rótulo `tag#id.classe` e o tamanho. Um **clique** troca a seleção por aquele elemento e desliga a mira; **Shift+clique** adiciona o elemento à seleção e mantém a mira ligada; **Esc** cancela.
 2. A mira também liga e desliga pelo botão **⌖** no cabeçalho do painel e pelo botão **"Selecionar elemento"** no popup da extensão (ícone na toolbar) — o popup fecha sozinho para o mouse chegar à página.
 3. Com o painel aberto e a mira desligada, **Shift+clique** em outros elementos da página adiciona ou remove cada um da seleção atual (clicar de novo no mesmo elemento com Shift o tira da seleção).
+   - O painel pode ser **arrastado pelo cabeçalho** para qualquer canto da tela; a posição escolhida vale até a página ser recarregada.
+   - O botão **⧉** do cabeçalho abre o editor em uma **janela separada** do Chrome (útil quando o painel cobre o que você quer editar, ou para trabalhar com dois monitores). A janela mostra a mesma seleção, o mesmo histórico e os mesmos botões; o botão **"Selecionar elemento na página"** liga a mira na aba, e **"Voltar para a página"** fecha a janela e traz o painel de volta. Fechar a janela pelo X encerra a edição, como o × do painel.
 4. Escreva o pedido na caixa de texto (ex.: "deixe o botão vermelho e maior") e clique em **Aplicar** (ou Ctrl/Cmd+Enter).
 5. O histórico de pedidos aparece no painel, cada um com um botão **Desfazer**. Os botões **Desfazer tudo** e **Refazer tudo** agem sobre todo o histórico da sessão.
 6. Todo pedido gera um grupo recolhido no Console do DevTools, com o prefixo `[Editor IA] Pedido #N — "texto do pedido"`, mostrando as operações pedidas e as alterações de fato aplicadas (ou o aviso, se alguma operação não encontrou o alvo).
@@ -99,6 +101,10 @@ Sem build step: JS puro (ES modules), Node 24, testes com `node --test` e `jsdom
 - [ ] Passar o mouse sobre outros elementos (contorno + rótulo acompanham), clicar em um e conferir que a seleção trocou e a mira desligou
 - [ ] Ligar a mira pelo botão ⌖ do painel, juntar um 2º elemento com Shift+clique e editar os dois em um único pedido
 - [ ] Ligar a mira pelo botão "Selecionar elemento" do popup e cancelar com Esc
+- [ ] Arrastar o painel pelo cabeçalho até a borda da tela (não pode sair da viewport), fechar e reabrir com o botão direito: reabre na posição escolhida
+- [ ] Clicar em ⧉ no painel: abre a janela separada com a seleção atual; usar "Selecionar elemento na página", escolher outro elemento e conferir que a janela volta ao foco com o chip atualizado
+- [ ] Enviar um pedido pela janela separada e conferir que a alteração aparece na página e no histórico da janela; "Voltar para a página" fecha a janela e reabre o painel flutuante com o mesmo histórico
+- [ ] Fechar a janela separada pelo X do sistema: a seleção some da página (mesmo efeito do × do painel)
 - [ ] Abrir as Opções no modo escuro do Chrome: só a seção do provedor escolhido aparece e os dropdowns ficam legíveis
 - [ ] Desfazer um dos pedidos pelo painel
 - [ ] Conferir o grupo do pedido no Console (`[Editor IA] Pedido #N — "..."`)

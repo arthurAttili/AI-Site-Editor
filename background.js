@@ -10,8 +10,14 @@ import { callProvider, testProvider, listModels } from "./lib/ai-call.js";
 const CONTEXT_MENU_ID = "aise-edit";
 const WARN_BADGE_MS = 3000;
 
-// tabId → Set<Port> de sidebars do DevTools abertos para aquela aba.
+// tabId → Set<Port> de sidebars do DevTools / janelas do editor abertas
+// para aquela aba (mesma porta `aise-devtools`).
 const devtoolsPortsByTab = new Map();
+
+// tabId → windowId da janela separada do editor (editor.html) daquela aba.
+const editorWindowsByTab = new Map();
+const EDITOR_WINDOW_WIDTH = 440;
+const EDITOR_WINDOW_HEIGHT = 700;
 
 // ---------------------------------------------------------------------------
 // Badge
@@ -127,6 +133,64 @@ chrome.runtime.onConnect.addListener((port) => {
 chrome.tabs.onRemoved.addListener((tabId) => {
   devtoolsPortsByTab.delete(tabId);
   clearWarnBadgeTimer(tabId);
+  // A aba morreu: a janela do editor dela ficaria órfã mostrando "sem
+  // extensão nesta aba" para sempre.
+  const windowId = editorWindowsByTab.get(tabId);
+  if (windowId != null) {
+    editorWindowsByTab.delete(tabId);
+    chrome.windows.remove(windowId).catch(() => {});
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Janela separada do editor (editor.html)
+// ---------------------------------------------------------------------------
+
+// Abre (ou só foca, se já existe) a janela do editor da aba. Uma janela por
+// aba: o content script fica "destacado" enquanto ela viver.
+async function openEditorWindow(tabId) {
+  const existing = editorWindowsByTab.get(tabId);
+  if (existing != null) {
+    try {
+      await chrome.windows.update(existing, { focused: true });
+      return { ok: true, windowId: existing };
+    } catch {
+      editorWindowsByTab.delete(tabId); // fechada sem passar pelo onRemoved
+    }
+  }
+  const win = await chrome.windows.create({
+    url: chrome.runtime.getURL(`editor.html?tabId=${tabId}`),
+    type: "popup",
+    width: EDITOR_WINDOW_WIDTH,
+    height: EDITOR_WINDOW_HEIGHT,
+  });
+  editorWindowsByTab.set(tabId, win.id);
+  return { ok: true, windowId: win.id };
+}
+
+function editorWindowStatus(tabId) {
+  return { ok: true, open: editorWindowsByTab.has(tabId) };
+}
+
+async function closeEditorWindow(tabId) {
+  const windowId = editorWindowsByTab.get(tabId);
+  if (windowId == null) return { ok: true, closed: false };
+  editorWindowsByTab.delete(tabId);
+  try {
+    await chrome.windows.remove(windowId);
+  } catch {
+    // já fechada
+  }
+  return { ok: true, closed: true };
+}
+
+chrome.windows.onRemoved.addListener((windowId) => {
+  for (const [tabId, id] of editorWindowsByTab) {
+    if (id !== windowId) continue;
+    editorWindowsByTab.delete(tabId);
+    // Avisa o content script para voltar ao modo painel-na-página.
+    chrome.tabs.sendMessage(tabId, { type: "EDITOR_WINDOW_CLOSED" }).catch(() => {});
+  }
 });
 
 // ---------------------------------------------------------------------------
@@ -224,6 +288,21 @@ async function routeMessage(message, sender) {
     case "OPEN_OPTIONS":
       chrome.runtime.openOptionsPage();
       return { ok: true };
+    case "OPEN_EDITOR_WINDOW": {
+      const tabId = sender.tab && sender.tab.id;
+      if (tabId == null) return { ok: false, error: "sem aba de origem" };
+      return openEditorWindow(tabId);
+    }
+    case "EDITOR_WINDOW_STATUS": {
+      const tabId = sender.tab && sender.tab.id;
+      if (tabId == null) return { ok: false, error: "sem aba de origem" };
+      return editorWindowStatus(tabId);
+    }
+    case "CLOSE_EDITOR_WINDOW": {
+      const tabId = sender.tab && sender.tab.id;
+      if (tabId == null) return { ok: false, error: "sem aba de origem" };
+      return closeEditorWindow(tabId);
+    }
     default:
       return { ok: false, error: "tipo desconhecido" };
   }

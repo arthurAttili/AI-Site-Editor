@@ -188,3 +188,45 @@ test("hide() cancela o timer do toast: ele não reaparece na próxima abertura",
   win.setTimeout = realSet;
   win.clearTimeout = realClear;
 });
+
+test("arrastar pelo cabeçalho move o painel, limita à viewport e a posição sobrevive a show()", () => {
+  const { doc, win } = makeDoc("<body></body>");
+  let detached = 0;
+  const p = createPanel(doc, { onDetach: () => detached++ });
+  p.show({ left: 100, top: 50, bottom: 60 });
+  const root = doc.querySelector("aise-panel").shadowRoot;
+  const container = root.querySelector(".aise-panel");
+  assert.equal(container.style.left, "100px");
+  assert.equal(container.style.top, "68px");
+  assert.equal(p.getPosition(), null);
+
+  const header = root.querySelector(".aise-panel-header");
+  header.dispatchEvent(new win.MouseEvent("mousedown", { bubbles: true, button: 0, clientX: 150, clientY: 80 }));
+  assert.ok(container.classList.contains("aise-panel-dragging"));
+  win.dispatchEvent(new win.MouseEvent("mousemove", { bubbles: true, clientX: 250, clientY: 130 }));
+  assert.equal(container.style.left, "200px");
+  assert.equal(container.style.top, "118px");
+  // Arrastar além da borda esquerda/superior é limitado pela margem.
+  win.dispatchEvent(new win.MouseEvent("mousemove", { bubbles: true, clientX: -500, clientY: -500 }));
+  assert.equal(container.style.left, "12px");
+  assert.equal(container.style.top, "12px");
+  win.dispatchEvent(new win.MouseEvent("mouseup", { bubbles: true }));
+  assert.equal(container.classList.contains("aise-panel-dragging"), false);
+  // Movimentos após soltar não movem mais.
+  win.dispatchEvent(new win.MouseEvent("mousemove", { bubbles: true, clientX: 400, clientY: 400 }));
+  assert.equal(container.style.left, "12px");
+  assert.deepEqual(p.getPosition(), { left: 12, top: 12 });
+
+  // Reabrir ancorado em outro elemento mantém a posição escolhida.
+  p.hide();
+  p.show({ left: 300, top: 300, bottom: 320 });
+  assert.equal(container.style.left, "12px");
+  assert.equal(container.style.top, "12px");
+
+  // Clicar num botão do cabeçalho não inicia arrasto.
+  const detachBtn = root.querySelector('[data-action="detach"]');
+  detachBtn.dispatchEvent(new win.MouseEvent("mousedown", { bubbles: true, button: 0, clientX: 0, clientY: 0 }));
+  assert.equal(container.classList.contains("aise-panel-dragging"), false);
+  detachBtn.click();
+  assert.equal(detached, 1);
+});

@@ -1,0 +1,35 @@
+/* editor.css — ajustes da janela separada do editor (editor.html) sobre o
+   visual da sidebar (sidebar.css): fonte um pouco maior, respiro nas bordas
+   e o estado "mira ligada" do botão de seleção. */
+
+body {
+  font-size: 13px;
+  padding: 12px;
+  min-height: 100vh;
+}
+
+.aise-sidebar {
+  gap: 10px;
+}
+
+.aise-inspected-row .aise-btn {
+  font-size: 12px;
+  padding: 6px 10px;
+}
+
+.aise-inspected-row .aise-btn[data-action="pick"] {
+  flex: 1 1 auto;
+}
+
+.aise-btn-active,
+.aise-btn-active:hover {
+  background: var(--aise-accent);
+  color: var(--aise-accent-fg);
+  border-color: var(--aise-accent);
+  filter: none;
+  opacity: 0.85;
+}
+
+.aise-form textarea {
+  min-height: 84px;
+}

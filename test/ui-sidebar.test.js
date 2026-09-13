@@ -175,3 +175,41 @@ test("Ctrl+Enter na textarea também envia", () => {
   textarea.dispatchEvent(evt);
   assert.equal(sent, "muda a cor");
 });
+
+test("variante window: mira e 'Voltar para a página' no lugar do $0; picking reflete no botão", () => {
+  const { doc } = makeDoc("<body><div id='root'></div></body>");
+  const root = doc.getElementById("root");
+  let picks = 0;
+  let docks = 0;
+  const view = createSidebarView(doc, root, { onPick: () => picks++, onDock: () => docks++ }, { variant: "window" });
+  assert.equal(root.querySelector('[data-action="use-selected"]'), null);
+  assert.equal(root.querySelector('[data-role="inspected"]'), null);
+  const pickBtn = root.querySelector('[data-action="pick"]');
+  const dockBtn = root.querySelector('[data-action="dock"]');
+  assert.ok(pickBtn && dockBtn);
+  pickBtn.click();
+  dockBtn.click();
+  assert.equal(picks, 1);
+  assert.equal(docks, 1);
+  view.setInspected("div#x"); // no-op nesta variante, não pode lançar
+  view.setState({ selection: [], history: [], activeCount: 0, originalMode: false, presetsApplied: [], picking: true });
+  assert.equal(pickBtn.getAttribute("aria-pressed"), "true");
+  assert.ok(pickBtn.classList.contains("aise-btn-active"));
+  view.setState({ selection: [], history: [], activeCount: 0, originalMode: false, presetsApplied: [], picking: false });
+  assert.equal(pickBtn.getAttribute("aria-pressed"), "false");
+  assert.equal(pickBtn.textContent, "Selecionar elemento na página");
+  view.setConnection("no-content");
+  assert.match(root.querySelector('[data-role="connection"]').textContent, /recarregue a página/);
+  view.setConnection("ok");
+  assert.equal(root.querySelector('[data-role="connection"]').textContent, "Conectado à página");
+});
+
+test("variante padrão (devtools) continua com $0 e textos do DevTools", () => {
+  const { doc } = makeDoc("<body><div id='root'></div></body>");
+  const root = doc.getElementById("root");
+  const view = createSidebarView(doc, root, {});
+  assert.ok(root.querySelector('[data-action="use-selected"]'));
+  assert.equal(root.querySelector('[data-action="pick"]'), null);
+  view.setConnection("disconnected");
+  assert.match(root.querySelector('[data-role="connection"]').textContent, /reabra o DevTools/);
+});
