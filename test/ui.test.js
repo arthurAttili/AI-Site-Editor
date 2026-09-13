@@ -1,0 +1,93 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import { makeDoc } from "./dom.js";
+import { createPanel } from "../lib/ui/panel.js";
+import { createIndicator } from "../lib/ui/indicator.js";
+
+test("painel abre, lista seleção e envia pedido", () => {
+  const { doc } = makeDoc("<body></body>");
+  let sent = null;
+  const p = createPanel(doc, { onSubmit: (t) => (sent = t), onUndo() {}, onUndoAll() {}, onRedoAll() {}, onSavePreset() {}, onClose() {}, onRemoveSelection() {}, onOpenOptions() {} });
+  p.show(); p.setSelection([{ id: "s1", label: "button.x" }]);
+  const root = doc.querySelector("aise-panel").shadowRoot;
+  assert.ok(root.textContent.includes("button.x"));
+  root.querySelector("textarea").value = "vermelho";
+  root.querySelector("form").dispatchEvent(new doc.defaultView.Event("submit", { cancelable: true }));
+  assert.equal(sent, "vermelho");
+  p.setHistory([{ id: "r1", n: 1, request: "vermelho", summary: "ok", undone: false, opsCount: 2 }]);
+  assert.ok(root.textContent.includes("ok"));
+  p.hide(); assert.equal(p.isOpen(), false);
+});
+
+test("indicador some sem alterações, mostra banner e alterna para original", () => {
+  const { doc } = makeDoc("<body></body>");
+  const ind = createIndicator(doc, { position: "bottom", onViewOriginal() {}, onEdit() {}, onDisableAuto() {} });
+  ind.update({ activeCount: 0, originalMode: false, presetNames: [], fromPreset: false, applied: 0, total: 0 });
+  assert.equal(doc.querySelector("aise-indicator"), null);
+  ind.update({ activeCount: 4, originalMode: false, presetNames: ["Menu"], fromPreset: true, applied: 4, total: 4 });
+  const root = doc.querySelector("aise-indicator").shadowRoot;
+  assert.match(root.textContent, /MODIFICADA por você/);
+  assert.match(root.textContent, /Menu/);
+  assert.ok(root.querySelector("[data-action=disable-auto]"));
+  root.querySelector("[data-action=minimize]").click();
+  assert.match(root.textContent, /Modificado por você · 4/);
+  ind.update({ activeCount: 4, originalMode: true, presetNames: ["Menu"], fromPreset: true, applied: 4, total: 4 });
+  assert.match(root.textContent, /ORIGINAL/);
+});
+
+test("createPanel é idempotente: segunda chamada não empilha hosts", () => {
+  const { doc } = makeDoc("<body></body>");
+  const handlers = { onSubmit() {}, onUndo() {}, onUndoAll() {}, onRedoAll() {}, onSavePreset() {}, onClose() {}, onRemoveSelection() {}, onOpenOptions() {} };
+  createPanel(doc, handlers);
+  createPanel(doc, handlers);
+  assert.equal(doc.querySelectorAll("aise-panel").length, 1);
+});
+
+test("setBusy(true) desabilita textarea e botão de envio", () => {
+  const { doc } = makeDoc("<body></body>");
+  const p = createPanel(doc, { onSubmit() {}, onUndo() {}, onUndoAll() {}, onRedoAll() {}, onSavePreset() {}, onClose() {}, onRemoveSelection() {}, onOpenOptions() {} });
+  p.show();
+  const root = doc.querySelector("aise-panel").shadowRoot;
+  p.setBusy(true);
+  assert.equal(root.querySelector("textarea").disabled, true);
+  assert.equal(root.querySelector('button[type="submit"]').disabled, true);
+  assert.match(root.textContent, /Pensando…/);
+  p.setBusy(false);
+  assert.equal(root.querySelector("textarea").disabled, false);
+  assert.equal(root.querySelector('button[type="submit"]').disabled, false);
+});
+
+test("histórico com entrada desfeita renderiza tachado e botão Desfeito desabilitado", () => {
+  const { doc } = makeDoc("<body></body>");
+  const p = createPanel(doc, { onSubmit() {}, onUndo() {}, onUndoAll() {}, onRedoAll() {}, onSavePreset() {}, onClose() {}, onRemoveSelection() {}, onOpenOptions() {} });
+  p.show();
+  p.setHistory([{ id: "r1", n: 1, request: "vermelho", summary: "ok", undone: true, opsCount: 2 }]);
+  const root = doc.querySelector("aise-panel").shadowRoot;
+  const undoBtn = root.querySelector('[data-action="undo"][data-id="r1"]');
+  assert.equal(undoBtn.textContent, "Desfeito");
+  assert.equal(undoBtn.disabled, true);
+  const entry = root.querySelector(".aise-history-entry");
+  assert.ok(entry.className.includes("undone"));
+});
+
+test("setPosition do indicador redocka sem perder estado minimizado", () => {
+  const { doc } = makeDoc("<body></body>");
+  const ind = createIndicator(doc, { position: "bottom", onViewOriginal() {}, onEdit() {}, onDisableAuto() {} });
+  ind.update({ activeCount: 2, originalMode: false, presetNames: [], fromPreset: false, applied: 2, total: 2 });
+  const root = doc.querySelector("aise-indicator").shadowRoot;
+  root.querySelector('[data-action="minimize"]').click();
+  assert.match(root.textContent, /Modificado por você · 2/);
+  ind.setPosition("top");
+  assert.match(root.textContent, /Modificado por você · 2/);
+  const container = root.querySelector(".aise-indicator");
+  assert.ok(container.className.includes("aise-indicator-top"));
+});
+
+test("banner sem presetNames omite a parte do preset", () => {
+  const { doc } = makeDoc("<body></body>");
+  const ind = createIndicator(doc, { position: "bottom", onViewOriginal() {}, onEdit() {}, onDisableAuto() {} });
+  ind.update({ activeCount: 3, originalMode: false, presetNames: [], fromPreset: false, applied: 3, total: 3 });
+  const root = doc.querySelector("aise-indicator").shadowRoot;
+  assert.match(root.textContent, /deste site \(3 alterações\)\. Não é o site original\./);
+  assert.doesNotMatch(root.textContent, /preset/);
+});
