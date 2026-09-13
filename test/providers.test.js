@@ -41,8 +41,11 @@ test("claude parse sem texto vira erro de formato", () => {
   assert.throws(() => claude.parseResponse({ content: [] }), (e) => e instanceof ProviderError && e.kind === "format");
 });
 test("gemini monta requisição", () => {
-  const { url, body } = gemini.buildRequest({ apiKey: "k", model: "gemini-3.7-flash" }, prompt);
-  assert.ok(url.startsWith("https://generativelanguage.googleapis.com/v1beta/models/gemini-3.7-flash:generateContent?key=k"));
+  const { url, headers, body } = gemini.buildRequest({ apiKey: "k", model: "gemini-3.7-flash" }, prompt);
+  // chave no header, nunca na query string
+  assert.equal(url, "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.7-flash:generateContent");
+  assert.equal(headers["x-goog-api-key"], "k");
+  assert.doesNotMatch(url, /key=/);
   assert.equal(body.systemInstruction.parts[0].text, "S");
   assert.equal(body.generationConfig.responseMimeType, "application/json");
   assert.ok(body.generationConfig.responseSchema);
@@ -106,4 +109,31 @@ test("index compat lê providers.compat.presetId (com fallback silencioso para p
   const legacyCfg = getProviderConfig(legacySettings);
   assert.equal(legacyCfg.baseUrl, "https://api.groq.com/openai/v1");
   assert.equal(legacyCfg.label, "Groq");
+});
+
+test("corpo da OpenAI não manda temperature (modelos de raciocínio recusam)", () => {
+  const { body } = openai.buildRequest({ apiKey: "k", model: "gpt-5", baseUrl: "https://api.openai.com/v1" }, prompt);
+  assert.equal("temperature" in body, false);
+  assert.equal(body.model, "gpt-5");
+});
+
+test("getProviderConfig exige o modelo: vazio vira erro amigável kind no-key", () => {
+  assert.throws(
+    () => getProviderConfig({ provider: "openai", providers: { openai: { apiKey: "o", model: "" } } }),
+    (e) => e instanceof ProviderError && e.kind === "no-key" && e.message === "Informe o modelo do provedor OpenAI nas opções.",
+  );
+  assert.throws(
+    () => getProviderConfig({ provider: "claude", providers: { claude: { apiKey: "c" } } }),
+    (e) => e instanceof ProviderError && e.kind === "no-key" && e.message === "Informe o modelo do provedor Claude (Anthropic) nas opções.",
+  );
+  // compat sem preset não tem modelo padrão de onde cair
+  assert.throws(
+    () => getProviderConfig({ provider: "compat", providers: { compat: { apiKey: "g", model: "", baseUrl: "https://x/v1" } } }),
+    (e) => e instanceof ProviderError && e.kind === "no-key" && e.message === "Informe o modelo do provedor Compatível com OpenAI nas opções.",
+  );
+  // a falta da chave continua vindo antes da falta do modelo
+  assert.throws(
+    () => getProviderConfig({ provider: "openai", providers: { openai: { apiKey: "", model: "" } } }),
+    (e) => e.message === "Informe a chave de API do provedor OpenAI.",
+  );
 });
