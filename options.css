@@ -46,6 +46,11 @@ body {
   font: 14px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 }
 
+/* O atributo hidden precisa vencer o display:flex das seções. */
+[hidden] {
+  display: none !important;
+}
+
 #root {
   display: flex;
   justify-content: center;
@@ -101,6 +106,17 @@ body {
   background: var(--aise-surface);
   color: var(--aise-fg);
   width: 100%;
+}
+
+/* Selects e suas opções usam fundo opaco: com o translúcido --aise-surface a
+   lista nativa fica ilegível no modo escuro do Chrome. */
+.aise-field select {
+  background-color: var(--aise-bg);
+}
+
+select option {
+  background-color: var(--aise-bg);
+  color: var(--aise-fg);
 }
 
 .aise-key-row {

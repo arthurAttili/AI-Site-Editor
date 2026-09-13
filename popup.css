@@ -45,6 +45,16 @@ body {
   font: 13px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 }
 
+[hidden] {
+  display: none !important;
+}
+
+select,
+select option {
+  background-color: var(--aise-bg);
+  color: var(--aise-fg);
+}
+
 #root {
   padding: 12px;
 }
@@ -87,6 +97,17 @@ body {
 .aise-btn:disabled {
   cursor: default;
   opacity: 0.5;
+}
+
+.aise-btn-primary {
+  border-color: var(--aise-accent);
+  background: var(--aise-accent);
+  color: var(--aise-accent-fg);
+  font-weight: 600;
+}
+
+.aise-btn-primary:hover:not(:disabled) {
+  filter: brightness(1.05);
 }
 
 .aise-btn-small {
