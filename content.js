@@ -29,6 +29,11 @@ let indicator = null;
 let logger = null;
 let settings = null;
 
+// Mensagem do erro que derrubou a inicialização (null enquanto tudo correu
+// bem). Guardada para que GET_STATE responda `{ok:false, error}` em vez de
+// deixar o popup esperando para sempre por uma promessa que nunca resolve.
+let initError = null;
+
 let readyResolve;
 const ready = new Promise((resolve) => {
   readyResolve = resolve;
@@ -75,6 +80,11 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 });
 
 async function handleMessage(message) {
+  // Inicialização falhou (import de lib/ bloqueado, storage indisponível…):
+  // toda mensagem responde o erro em vez de estourar um TypeError em `session`
+  // — o popup e o sidebar precisam de uma resposta para não ficarem esperando.
+  if (initError) return { ok: false, error: initError };
+
   switch (message && message.type) {
     case "OPEN_EDITOR":
       openEditorFor(lastTarget || document.body);
@@ -88,6 +98,7 @@ async function handleMessage(message) {
       return { ok: true, state: currentState() };
     }
     case "REQUEST_EDIT":
+      if (session.originalMode) return originalModeEditBlockedReply();
       await submitRequest(message.text);
       return { ok: true, state: currentState() };
     case "GET_STATE":
@@ -233,6 +244,10 @@ function closePanel() {
 
 async function submitRequest(text) {
   const p = ensurePanel();
+  if (session.originalMode) {
+    p.setError(ORIGINAL_MODE_EDIT_BLOCK_MSG);
+    return;
+  }
   p.setBusy(true);
   p.setError(null);
 
@@ -298,10 +313,19 @@ async function submitRequest(text) {
 // lib/session.js), mas aqui a gente também barra antes de mexer e avisa o
 // usuário — tanto pelo botão do painel quanto por mensagem (ver `handleMessage`).
 const ORIGINAL_MODE_BLOCK_MSG = "Saia do modo original para desfazer/refazer.";
+// Editar no modo original aplicaria a mudança sobre um DOM revertido e a
+// entrada seria "reaplicada" de novo ao sair do modo — o mesmo motivo pelo
+// qual undo/redo já eram barrados.
+const ORIGINAL_MODE_EDIT_BLOCK_MSG = "Saia do modo original para editar.";
 
 function originalModeBlockedReply() {
   if (panel) panel.setError(ORIGINAL_MODE_BLOCK_MSG);
   return { ok: false, error: ORIGINAL_MODE_BLOCK_MSG };
+}
+
+function originalModeEditBlockedReply() {
+  if (panel) panel.setError(ORIGINAL_MODE_EDIT_BLOCK_MSG);
+  return { ok: false, error: ORIGINAL_MODE_EDIT_BLOCK_MSG };
 }
 
 function blockIfOriginal() {
@@ -368,7 +392,10 @@ function refresh() {
       total,
     });
   }
-  if (panel) panel.setHistory(state.history);
+  if (panel) {
+    panel.setHistory(state.history);
+    panel.setOriginalMode(state.originalMode);
+  }
   sendToBackground({ type: "STATE_CHANGED", state });
 }
 
@@ -413,20 +440,39 @@ async function savePresetFlow(providedName) {
   showToast("Preset salvo. Ele não será aplicado sozinho; ligue 'auto-aplicar' no popup se quiser.");
 }
 
+// Um preset vem do storage — que pode ter sido escrito por uma versão antiga
+// da extensão, editado à mão ou corrompido — e vai direto para applyOps. Passa
+// pelo mesmo validateOps das respostas do modelo antes de tocar no DOM.
+function checkedPresetOps(preset) {
+  const { ops, errors } = libs.ops.validateOps(preset.ops);
+  if (errors.length > 0) {
+    console.warn(`[Editor IA] preset "${preset.name}" tem ${errors.length} operação(ões) inválida(s), ignorada(s): ${errors.join("; ")}`);
+  }
+  return ops;
+}
+
 async function applyPresetById(presetId) {
   const presets = await libs.storage.getPresets(chrome.storage.local, location.origin);
   const preset = presets.find((p) => p.id === presetId);
   if (!preset) return;
-  const { applied, total, missing } = session.applyPreset(preset);
+  const ops = checkedPresetOps(preset);
+  if (ops.length === 0) return;
+  const { applied, total, missing } = session.applyPreset({ ...preset, ops });
   logger.preset({ name: preset.name, applied, total, missing });
   refresh();
 }
 
 async function autoApplyPresets() {
+  // Só o frame de topo auto-aplica: um iframe é outra página, com outra
+  // origem possível, e aplicar o preset do site dentro dele duplicaria as
+  // alterações e a contagem do indicador.
+  if (window !== window.top) return;
   const presets = await libs.storage.getPresets(chrome.storage.local, location.origin);
   const autoPresets = presets.filter((p) => p.autoApply);
   for (const preset of autoPresets) {
-    const { applied, total, missing } = session.applyPreset(preset, { auto: true });
+    const ops = checkedPresetOps(preset);
+    if (ops.length === 0) continue;
+    const { applied, total, missing } = session.applyPreset({ ...preset, ops }, { auto: true });
     logger.preset({ name: preset.name, applied, total, missing });
   }
   if (autoPresets.length > 0) {
@@ -452,6 +498,19 @@ let libs = null;
 let panelFactory = null;
 
 (async () => {
+  try {
+    await init();
+  } catch (err) {
+    initError = `Não foi possível iniciar o Editor IA nesta página: ${err && err.message ? err.message : String(err)}`;
+    console.error("[Editor IA] falha na inicialização:", err);
+  } finally {
+    // `ready` SEMPRE resolve: quem espera por ela (handleMessage) precisa
+    // seguir e responder o erro, não ficar pendurado.
+    readyResolve();
+  }
+})();
+
+async function init() {
   libs = await loadLibs();
   panelFactory = libs.panel.createPanel;
 
@@ -480,7 +539,5 @@ let panelFactory = null;
 
   await autoApplyPresets();
   refresh();
-
-  readyResolve();
-})();
+}
 })();

@@ -40,12 +40,21 @@ function updateBadge(tabId, state) {
 
 // Badge de aviso temporário quando o menu de contexto não conseguiu abrir o
 // editor (sem permissão de `chrome.notifications` — ver manifest.json).
+// O timer é rastreado por aba: sem isso, dois avisos seguidos deixam dois
+// setTimeout vivos e o primeiro a vencer limpa o badge do segundo antes da
+// hora (e ainda apaga um badge de contagem que já tenha voltado).
+const warnBadgeTimers = new Map();
+
 function warnBadge(tabId) {
+  const pending = warnBadgeTimers.get(tabId);
+  if (pending) clearTimeout(pending);
   chrome.action.setBadgeText({ tabId, text: "!" });
   chrome.action.setBadgeBackgroundColor({ tabId, color: "#d93025" });
-  setTimeout(() => {
+  const timer = setTimeout(() => {
+    warnBadgeTimers.delete(tabId);
     chrome.action.setBadgeText({ tabId, text: "" });
   }, WARN_BADGE_MS);
+  warnBadgeTimers.set(tabId, timer);
 }
 
 // ---------------------------------------------------------------------------
@@ -108,6 +117,11 @@ chrome.runtime.onConnect.addListener((port) => {
 
 chrome.tabs.onRemoved.addListener((tabId) => {
   devtoolsPortsByTab.delete(tabId);
+  const pending = warnBadgeTimers.get(tabId);
+  if (pending) {
+    clearTimeout(pending);
+    warnBadgeTimers.delete(tabId);
+  }
 });
 
 // ---------------------------------------------------------------------------
@@ -191,6 +205,10 @@ async function routeMessage(message, sender) {
     case "LIST_MODELS":
       return handleListModels(message);
     case "STATE_CHANGED": {
+      // Só o frame de topo fala pela aba. Um iframe com o content script
+      // rodando tem a própria sessão; deixá-lo escrever no badge e nas portas
+      // do DevTools sobrescreveria o estado real da página.
+      if (sender.frameId !== undefined && sender.frameId !== 0) return { ok: true };
       const tabId = sender.tab && sender.tab.id;
       if (tabId != null) {
         updateBadge(tabId, message.state);

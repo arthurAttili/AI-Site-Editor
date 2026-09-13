@@ -27,9 +27,23 @@ let presetsCache = [];
 // recém-aberta) ou nunca — nesse caso injeta `content.js` uma vez e tenta de
 // novo; se ainda assim falhar, `setState(null)` (badge "extensão não
 // carregada nesta aba", conforme regra do controller para a Task 13).
+const GET_STATE_TIMEOUT_MS = 5000;
+
+// `sendMessage` pode nunca resolver: se o content script registrou o listener
+// mas travou antes de responder, a promise fica pendurada e o popup mostra
+// "carregando" para sempre. Timeout explícito → tratado como falha.
+function sendGetState(id) {
+  return Promise.race([
+    chrome.tabs.sendMessage(id, { type: "GET_STATE" }),
+    new Promise((_, reject) => {
+      setTimeout(() => reject(new Error("tempo esgotado ao falar com a página")), GET_STATE_TIMEOUT_MS);
+    }),
+  ]);
+}
+
 async function getStateWithRetry(id) {
   try {
-    return await chrome.tabs.sendMessage(id, { type: "GET_STATE" });
+    return await sendGetState(id);
   } catch {
     try {
       await chrome.scripting.executeScript({ target: { tabId: id }, files: ["content.js"] });
@@ -37,7 +51,7 @@ async function getStateWithRetry(id) {
       return null;
     }
     try {
-      return await chrome.tabs.sendMessage(id, { type: "GET_STATE" });
+      return await sendGetState(id);
     } catch {
       return null;
     }
@@ -115,7 +129,7 @@ function onSetAutoApply(id, value) {
 function onRemovePreset(id) {
   const preset = presetsCache.find((p) => p.id === id);
   const name = preset ? preset.name : "";
-  if (!window.confirm(`Remover o preset '${name}'?`)) return;
+  if (!window.confirm(`Remover o preset "${name}"?`)) return;
   runAction(() => deletePreset(chrome.storage.local, origin, id));
 }
 

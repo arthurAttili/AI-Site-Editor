@@ -121,3 +121,51 @@ test("indicador se reancora: host arrancado do DOM volta no próximo update", ()
   assert.ok(back, "host volta ao DOM");
   assert.match(back.shadowRoot.textContent, /MODIFICADA por você/);
 });
+
+test("modo original desabilita o botão de aplicar do painel e sair reabilita", () => {
+  const { doc } = makeDoc("<body></body>");
+  const p = createPanel(doc, { onSubmit() {}, onUndo() {}, onUndoAll() {}, onRedoAll() {}, onSavePreset() {}, onClose() {}, onRemoveSelection() {}, onOpenOptions() {} });
+  p.show();
+  const root = doc.querySelector("aise-panel").shadowRoot;
+  const submit = root.querySelector('button[type="submit"]');
+
+  p.setOriginalMode(true);
+  assert.equal(submit.disabled, true);
+  assert.equal(submit.title, "Saia do modo original para editar.");
+
+  // setBusy(false) não pode reabilitar o envio enquanto o modo original vale
+  p.setBusy(true);
+  p.setBusy(false);
+  assert.equal(submit.disabled, true, "modo original continua bloqueando");
+
+  p.setOriginalMode(false);
+  assert.equal(submit.disabled, false);
+});
+
+test("hide() cancela o timer do toast: ele não reaparece na próxima abertura", () => {
+  const { doc, win } = makeDoc("<body></body>");
+  const p = createPanel(doc, { onSubmit() {}, onUndo() {}, onUndoAll() {}, onRedoAll() {}, onSavePreset() {}, onClose() {}, onRemoveSelection() {}, onOpenOptions() {} });
+  p.show();
+  const root = doc.querySelector("aise-panel").shadowRoot;
+  const toastEl = root.querySelector('[data-role="toast"]');
+
+  let pending = 0;
+  const realSet = win.setTimeout;
+  const realClear = win.clearTimeout;
+  win.setTimeout = (fn, ms) => { pending += 1; return realSet(fn, ms); };
+  win.clearTimeout = (id) => { pending -= 1; return realClear(id); };
+
+  p.toast("Preset salvo.");
+  assert.equal(toastEl.hidden, false);
+  assert.equal(pending, 1);
+
+  p.hide();
+  assert.equal(pending, 0, "timer do toast cancelado no hide()");
+  assert.equal(toastEl.hidden, true);
+
+  p.show();
+  assert.equal(toastEl.hidden, true, "toast não volta ao reabrir o painel");
+
+  win.setTimeout = realSet;
+  win.clearTimeout = realClear;
+});
