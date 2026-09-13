@@ -202,3 +202,26 @@ test("setAttr style perigoso e setStyle com expression() são recusados", () => 
   assert.equal(rec3.matched, 1);
   assert.equal(a.style.color, "red");
 });
+
+test("injectCSS aceita classe do site que só contém 'aise-' no meio, como .praise-box", () => {
+  const { doc } = makeDoc("<body><p class='praise-box'>a</p></body>");
+
+  const ok = applyOp({ op: "injectCSS", selector: "", name: "", value: ".praise-box{color:red}", position: "" }, doc, {});
+  assert.equal(ok.matched, 1, ".praise-box não é referência à extensão");
+  assert.equal(ok.warning, undefined);
+
+  const ok2 = applyOp({ op: "injectCSS", selector: "", name: "", value: "#malaise-banner,.turquoise-bg{margin:0}", position: "" }, doc, {});
+  assert.equal(ok2.matched, 1);
+
+  // a borda de identificador continua pegando as formas que importam
+  for (const value of [
+    "aise-indicator{display:none}",
+    ".x, aise-panel{display:none}",
+    "body > aise-indicator{opacity:0}",
+    '[data-aise-id="s1"], aise-indicator{display:none}',
+  ]) {
+    const rec = applyOp({ op: "injectCSS", selector: "", name: "", value, position: "" }, doc, {});
+    assert.equal(rec.matched, 0, `deveria recusar: ${value}`);
+    assert.match(rec.warning, /bloqueado por segurança/);
+  }
+});

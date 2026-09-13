@@ -134,3 +134,21 @@ test("listModels: só openai/compat; outros lançam erro em pt-BR", async () => 
   const models = await listModels(openaiSettings(), { fetch: fetchImpl });
   assert.deepEqual(models, ["a", "b"]);
 });
+
+test("listModels funciona com modelo vazio: é o passo anterior à escolha do modelo", async () => {
+  const fetchImpl = async () => jsonRes(200, { data: [{ id: "gpt-x" }, { id: "gpt-y" }] });
+  const semModelo = { provider: "openai", providers: { openai: { apiKey: "k", model: "" } } };
+  assert.deepEqual(await listModels(semModelo, { fetch: fetchImpl }), ["gpt-x", "gpt-y"]);
+
+  const compatSemModelo = {
+    provider: "compat",
+    providers: { compat: { apiKey: "k", model: "", baseUrl: "https://x/v1" } },
+  };
+  assert.deepEqual(await listModels(compatSemModelo, { fetch: fetchImpl }), ["gpt-x", "gpt-y"]);
+
+  // mas pedir uma edição com modelo vazio continua barrado antes do fetch
+  await assert.rejects(
+    () => callProvider(semModelo, prompt, { fetch: async () => { throw new Error("não deveria chamar a rede"); } }),
+    (err) => err instanceof ProviderError && err.kind === "no-key" && err.message === "Informe o modelo do provedor OpenAI nas opções.",
+  );
+});

@@ -46,7 +46,7 @@ function connectPort() {
   // derrubaria o boot inteiro do painel. onDisconnect reagenda a reconexão.
   try {
     port.postMessage({ type: "INIT", tabId: chrome.devtools.inspectedWindow.tabId });
-  } catch (err) {
+  } catch {
     view.setError("Conexão com a extensão caiu; tentando de novo…");
   }
   port.onMessage.addListener(onPortMessage);

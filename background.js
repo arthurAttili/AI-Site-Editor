@@ -17,9 +17,24 @@ const devtoolsPortsByTab = new Map();
 // Badge
 // ---------------------------------------------------------------------------
 
+// O timer do badge de aviso é rastreado por aba: sem isso, dois avisos seguidos
+// deixam dois setTimeout vivos e o primeiro a vencer limpa o badge do segundo
+// antes da hora — ou apaga um badge de contagem que já tinha voltado.
+const warnBadgeTimers = new Map();
+
+function clearWarnBadgeTimer(tabId) {
+  const pending = warnBadgeTimers.get(tabId);
+  if (pending === undefined) return;
+  clearTimeout(pending);
+  warnBadgeTimers.delete(tabId);
+}
+
 // `state`: `{activeCount, originalMode}` vindo do content script. ORIG (cinza)
 // tem prioridade sobre MOD (vermelho); sem estado relevante, o badge some.
 function updateBadge(tabId, state) {
+  // O badge de contagem substitui o "!" agora; deixar o timer de limpeza vivo
+  // faria ele apagar este badge alguns segundos depois.
+  clearWarnBadgeTimer(tabId);
   let text = "";
   let color = "";
   if (state && state.originalMode) {
@@ -40,14 +55,8 @@ function updateBadge(tabId, state) {
 
 // Badge de aviso temporário quando o menu de contexto não conseguiu abrir o
 // editor (sem permissão de `chrome.notifications` — ver manifest.json).
-// O timer é rastreado por aba: sem isso, dois avisos seguidos deixam dois
-// setTimeout vivos e o primeiro a vencer limpa o badge do segundo antes da
-// hora (e ainda apaga um badge de contagem que já tenha voltado).
-const warnBadgeTimers = new Map();
-
 function warnBadge(tabId) {
-  const pending = warnBadgeTimers.get(tabId);
-  if (pending) clearTimeout(pending);
+  clearWarnBadgeTimer(tabId);
   chrome.action.setBadgeText({ tabId, text: "!" });
   chrome.action.setBadgeBackgroundColor({ tabId, color: "#d93025" });
   const timer = setTimeout(() => {
@@ -117,11 +126,7 @@ chrome.runtime.onConnect.addListener((port) => {
 
 chrome.tabs.onRemoved.addListener((tabId) => {
   devtoolsPortsByTab.delete(tabId);
-  const pending = warnBadgeTimers.get(tabId);
-  if (pending) {
-    clearTimeout(pending);
-    warnBadgeTimers.delete(tabId);
-  }
+  clearWarnBadgeTimer(tabId);
 });
 
 // ---------------------------------------------------------------------------

@@ -364,3 +364,30 @@ test("autoApplied só é verdadeiro quando um preset veio do auto-aplicar", () =
   state = session.publicState({});
   assert.equal(state.autoApplied, true);
 });
+
+test("applyPreset no modo original é recusado: não escreve no DOM nem em presetsApplied", () => {
+  const { doc, win } = makeDoc("<body><p id='a'>a</p></body>");
+  const session = makeSession(doc, win);
+  const a = doc.getElementById("a");
+
+  session.toggleOriginal();
+  assert.equal(session.publicState().originalMode, true);
+
+  const preset = {
+    id: "p1",
+    name: "Menu",
+    ops: [
+      { op: "setStyle", selector: "#a", name: "color", value: "red", position: "" },
+      { op: "setStyle", selector: "#a", name: "margin", value: "0", position: "" },
+    ],
+  };
+  const res = session.applyPreset(preset);
+  assert.deepEqual(res, { applied: 0, total: 2, missing: [] });
+  assert.equal(a.style.color, "", "o DOM revertido continua revertido");
+  assert.equal(session.publicState().presetsApplied.length, 0);
+
+  // saindo do modo original, o preset recusado não ressuscita
+  session.toggleOriginal();
+  assert.equal(a.style.color, "");
+  assert.equal(session.activeCount(), 0);
+});

@@ -32,13 +32,20 @@ const GET_STATE_TIMEOUT_MS = 5000;
 // `sendMessage` pode nunca resolver: se o content script registrou o listener
 // mas travou antes de responder, a promise fica pendurada e o popup mostra
 // "carregando" para sempre. Timeout explícito → tratado como falha.
-function sendGetState(id) {
-  return Promise.race([
-    chrome.tabs.sendMessage(id, { type: "GET_STATE" }),
-    new Promise((_, reject) => {
-      setTimeout(() => reject(new Error("tempo esgotado ao falar com a página")), GET_STATE_TIMEOUT_MS);
-    }),
-  ]);
+async function sendGetState(id) {
+  let timer;
+  try {
+    return await Promise.race([
+      chrome.tabs.sendMessage(id, { type: "GET_STATE" }),
+      new Promise((_, reject) => {
+        timer = setTimeout(() => reject(new Error("tempo esgotado ao falar com a página")), GET_STATE_TIMEOUT_MS);
+      }),
+    ]);
+  } finally {
+    // O perdedor da race não é cancelado sozinho: sem isso, uma resposta rápida
+    // deixa um timer de 5 s vivo (e o popup pode fechar antes de ele vencer).
+    clearTimeout(timer);
+  }
 }
 
 async function getStateWithRetry(id) {
