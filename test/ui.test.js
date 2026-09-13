@@ -242,3 +242,33 @@ test("botão Copiar log do painel chama onCopyLog", () => {
   btn.click();
   assert.equal(calls, 1);
 });
+
+test("teclas digitadas no painel não vazam para os atalhos da página (YouTube: 'k' pausa)", () => {
+  const { doc, win } = makeDoc("<body></body>");
+  let closed = 0;
+  let sent = "";
+  const p = createPanel(doc, { onSubmit: (t) => (sent = t), onClose: () => closed++ });
+  p.show();
+  const textarea = doc.querySelector("aise-panel").shadowRoot.querySelector("textarea");
+  // Simula um atalho global da página que cancela letras fora de campos de texto.
+  const seen = [];
+  doc.addEventListener("keydown", (e) => {
+    seen.push(e.key);
+    if (e.key === "k") e.preventDefault();
+  });
+  win.addEventListener("keypress", (e) => seen.push("press:" + e.key));
+  win.addEventListener("keyup", (e) => seen.push("up:" + e.key));
+  const evt = new win.KeyboardEvent("keydown", { key: "k", bubbles: true, cancelable: true, composed: true });
+  textarea.dispatchEvent(evt);
+  textarea.dispatchEvent(new win.KeyboardEvent("keypress", { key: "k", bubbles: true, cancelable: true, composed: true }));
+  textarea.dispatchEvent(new win.KeyboardEvent("keyup", { key: "k", bubbles: true, cancelable: true, composed: true }));
+  assert.deepEqual(seen, [], "nenhum evento de teclado do textarea chega ao documento/window");
+  assert.equal(evt.defaultPrevented, false, "a página não conseguiu cancelar a letra");
+  // Os atalhos do próprio painel continuam funcionando.
+  textarea.dispatchEvent(new win.KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true, composed: true }));
+  assert.equal(closed, 1, "Esc ainda fecha o painel");
+  textarea.value = "pedido";
+  textarea.dispatchEvent(new win.KeyboardEvent("keydown", { key: "Enter", ctrlKey: true, bubbles: true, cancelable: true, composed: true }));
+  assert.equal(sent, "pedido", "Ctrl+Enter ainda envia");
+  assert.deepEqual(seen, [], "nem Esc nem Ctrl+Enter vazam para a página");
+});
