@@ -321,7 +321,10 @@ function doUndo(id) {
 function doUndoAll() {
   if (blockIfOriginal()) return;
   const active = currentState().history.filter((h) => !h.undone);
-  for (const h of active) session.undoRequest(h.id);
+  // Do mais novo para o mais antigo: com duas edições sobrepostas no mesmo
+  // elemento, desfazer na ordem de aplicação deixaria o valor da primeira
+  // edição no lugar do valor original da página.
+  for (let i = active.length - 1; i >= 0; i--) session.undoRequest(active[i].id);
   for (const h of active) logger.undo({ n: h.n, request: h.request });
   refresh();
 }
@@ -351,7 +354,7 @@ function refresh() {
   // quanto — no modo original — o total "desligado temporariamente".
   const total =
     state.history.filter((h) => !h.undone).reduce((sum, h) => sum + h.opsCount, 0) +
-    state.presetsApplied.reduce((sum, p) => sum + p.total, 0);
+    state.presetsApplied.reduce((sum, p) => sum + p.applied, 0);
   const applied = state.presetsApplied.reduce((sum, p) => sum + p.applied, 0);
 
   if (indicator) {
@@ -360,6 +363,7 @@ function refresh() {
       originalMode: state.originalMode,
       presetNames: state.presetsApplied.map((p) => p.name),
       fromPreset: state.fromPreset,
+      autoApplied: state.autoApplied,
       applied,
       total,
     });
@@ -422,7 +426,7 @@ async function autoApplyPresets() {
   const presets = await libs.storage.getPresets(chrome.storage.local, location.origin);
   const autoPresets = presets.filter((p) => p.autoApply);
   for (const preset of autoPresets) {
-    const { applied, total, missing } = session.applyPreset(preset);
+    const { applied, total, missing } = session.applyPreset(preset, { auto: true });
     logger.preset({ name: preset.name, applied, total, missing });
   }
   if (autoPresets.length > 0) {
@@ -462,6 +466,7 @@ let panelFactory = null;
     redoRecords: libs.ops.redoRecords,
     stabilizeOps: libs.storage.stabilizeOps,
     sanitize,
+    warn: (msg) => console.warn(`[Editor IA] ${msg}`),
   });
 
   settings = await libs.storage.getSettings(chrome.storage.local);

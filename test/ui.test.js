@@ -24,15 +24,28 @@ test("indicador some sem alterações, mostra banner e alterna para original", (
   const ind = createIndicator(doc, { position: "bottom", onViewOriginal() {}, onEdit() {}, onDisableAuto() {} });
   ind.update({ activeCount: 0, originalMode: false, presetNames: [], fromPreset: false, applied: 0, total: 0 });
   assert.equal(doc.querySelector("aise-indicator"), null);
-  ind.update({ activeCount: 4, originalMode: false, presetNames: ["Menu"], fromPreset: true, applied: 4, total: 4 });
+  ind.update({ activeCount: 4, originalMode: false, presetNames: ["Menu"], fromPreset: true, autoApplied: true, applied: 4, total: 4 });
   const root = doc.querySelector("aise-indicator").shadowRoot;
   assert.match(root.textContent, /MODIFICADA por você/);
   assert.match(root.textContent, /Menu/);
   assert.ok(root.querySelector("[data-action=disable-auto]"));
   root.querySelector("[data-action=minimize]").click();
   assert.match(root.textContent, /Modificado por você · 4/);
-  ind.update({ activeCount: 4, originalMode: true, presetNames: ["Menu"], fromPreset: true, applied: 4, total: 4 });
+  ind.update({ activeCount: 4, originalMode: true, presetNames: ["Menu"], fromPreset: true, autoApplied: true, applied: 4, total: 4 });
   assert.match(root.textContent, /ORIGINAL/);
+});
+
+test("indicador só oferece 'Desligar auto-aplicar' quando autoApplied é verdadeiro", () => {
+  const { doc } = makeDoc("<body></body>");
+  const ind = createIndicator(doc, { position: "bottom", onViewOriginal() {}, onEdit() {}, onDisableAuto() {} });
+
+  // preset aplicado à mão pelo popup: fromPreset true, mas nada a desligar
+  ind.update({ activeCount: 2, originalMode: false, presetNames: ["Menu"], fromPreset: true, autoApplied: false, applied: 2, total: 2 });
+  const root = doc.querySelector("aise-indicator").shadowRoot;
+  assert.equal(root.querySelector("[data-action=disable-auto]"), null);
+
+  ind.update({ activeCount: 2, originalMode: false, presetNames: ["Menu"], fromPreset: true, autoApplied: true, applied: 2, total: 2 });
+  assert.ok(root.querySelector("[data-action=disable-auto]"));
 });
 
 test("createPanel é idempotente: segunda chamada não empilha hosts", () => {

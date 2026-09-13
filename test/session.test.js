@@ -190,11 +190,177 @@ test("applyPreset counts applied vs missing when a selector matches nothing", ()
   assert.equal(result.total, 2);
   assert.deepEqual(result.missing, ["#does-not-exist"]);
   assert.equal(doc.getElementById("a").style.color, "red");
-  assert.equal(session.activeCount(), 2);
+  // `activeCount` soma o que de fato mudou na página (`applied`), não `total`:
+  // a op cujo seletor não casou não é uma alteração.
+  assert.equal(session.activeCount(), 1);
 
   const state = session.publicState({});
   assert.deepEqual(state.presetsApplied, [{ id: "preset-1", name: "Meu preset", applied: 1, total: 2 }]);
   assert.equal(state.fromPreset, true);
 
   assert.deepEqual(session.disableAutoIds(), ["preset-1"]);
+});
+
+test("desfazer tudo com edições sobrepostas volta ao valor original, não ao da primeira edição", () => {
+  const { doc, win } = makeDoc("<body><p id='a' style='color: black'>oi</p></body>");
+  const session = makeSession(doc, win);
+  const a = doc.getElementById("a");
+
+  session.selectOnly(a);
+  const e1 = session.addRequest({
+    request: "1",
+    summary: "s1",
+    ops: [{ op: "setStyle", selector: "#a", name: "color", value: "red", position: "" }],
+  });
+  session.selectOnly(a);
+  const e2 = session.addRequest({
+    request: "2",
+    summary: "s2",
+    ops: [{ op: "setStyle", selector: "#a", name: "color", value: "blue", position: "" }],
+  });
+  assert.equal(a.style.color, "blue");
+
+  // do mais novo para o mais antigo
+  session.undoRequest(e2.id);
+  session.undoRequest(e1.id);
+  assert.equal(a.style.color, "black", "volta ao valor original da página");
+});
+
+test("toggleOriginal com dois pedidos sobrepostos no mesmo elemento volta ao original e depois ao último valor", () => {
+  const { doc, win } = makeDoc("<body><p id='a' style='color: black'>oi</p></body>");
+  const session = makeSession(doc, win);
+  const a = doc.getElementById("a");
+
+  session.selectOnly(a);
+  session.addRequest({
+    request: "1",
+    summary: "s1",
+    ops: [{ op: "setStyle", selector: "#a", name: "color", value: "red", position: "" }],
+  });
+  session.selectOnly(a);
+  session.addRequest({
+    request: "2",
+    summary: "s2",
+    ops: [{ op: "setStyle", selector: "#a", name: "color", value: "blue", position: "" }],
+  });
+  assert.equal(a.style.color, "blue");
+
+  session.toggleOriginal();
+  assert.equal(a.style.color, "black", "modo original mostra o estilo inicial, não o da primeira edição");
+
+  session.toggleOriginal();
+  assert.equal(a.style.color, "blue", "ao voltar, vale a edição mais recente");
+});
+
+test("redo reaplica os seletores estáveis do pedido, não o marcador [data-aise-id] reciclado", () => {
+  const { doc, win } = makeDoc("<body><p id='a'>a</p><p id='b'>b</p></body>");
+  const session = makeSession(doc, win);
+  const a = doc.getElementById("a");
+  const b = doc.getElementById("b");
+
+  session.selectOnly(a);
+  const entry = session.addRequest({
+    request: "vermelho",
+    summary: "s",
+    ops: [{ op: "setStyle", selector: '[data-aise-id="s1"]', name: "color", value: "red", position: "" }],
+  });
+  assert.equal(a.style.color, "red");
+
+  session.undoRequest(entry.id);
+  assert.equal(a.style.color, "");
+
+  // B recebe o mesmo marcador que A tinha
+  session.selectOnly(b);
+  assert.equal(b.getAttribute("data-aise-id"), "s1");
+
+  session.redoRequest(entry.id);
+  assert.equal(a.style.color, "red", "o redo acerta A");
+  assert.equal(b.style.color, "", "e não vaza para B");
+});
+
+test("redo cujo seletor não casa mais marca a entrada como desfeita e avisa", () => {
+  const { doc, win } = makeDoc("<body><p id='a'>a</p></body>");
+  const warnings = [];
+  const session = createSession({
+    doc,
+    win,
+    applyOps,
+    undoRecords,
+    redoRecords,
+    stabilizeOps,
+    sanitize: (html) => sanitizeHTML(html, doc),
+    warn: (msg) => warnings.push(msg),
+  });
+  const a = doc.getElementById("a");
+  session.selectOnly(a);
+  const entry = session.addRequest({
+    request: "vermelho",
+    summary: "s",
+    ops: [{ op: "setStyle", selector: "#a", name: "color", value: "red", position: "" }],
+  });
+  session.undoRequest(entry.id);
+  session.clear();
+  a.remove();
+
+  assert.equal(session.redoRequest(entry.id), false);
+  assert.equal(session.activeCount(), 0, "entrada que não casou não conta como ativa");
+  assert.equal(session.publicState({}).history[0].undone, true);
+  assert.equal(warnings.length, 1);
+  assert.match(warnings[0], /nenhum elemento correspondeu/);
+});
+
+test("applyPreset do mesmo preset duas vezes não empilha: um item em presetsApplied e activeCount não dobra", () => {
+  const { doc, win } = makeDoc("<body><p id='a'>oi</p></body>");
+  const session = makeSession(doc, win);
+  const preset = {
+    id: "preset-1",
+    name: "Meu preset",
+    ops: [{ op: "setStyle", selector: "#a", name: "color", value: "red", position: "" }],
+  };
+
+  session.applyPreset(preset);
+  session.applyPreset(preset);
+
+  const state = session.publicState({});
+  assert.equal(state.presetsApplied.length, 1);
+  assert.equal(state.activeCount, 1);
+  assert.equal(doc.getElementById("a").style.color, "red");
+});
+
+test("reaplicar um preset editado reflete a versão nova, não a antiga", () => {
+  const { doc, win } = makeDoc("<body><p id='a'>oi</p></body>");
+  const session = makeSession(doc, win);
+
+  session.applyPreset({
+    id: "preset-1",
+    name: "Meu preset",
+    ops: [{ op: "setStyle", selector: "#a", name: "color", value: "red", position: "" }],
+  });
+  session.applyPreset({
+    id: "preset-1",
+    name: "Meu preset",
+    ops: [{ op: "setStyle", selector: "#a", name: "color", value: "green", position: "" }],
+  });
+
+  assert.equal(doc.getElementById("a").style.color, "green");
+  assert.equal(session.publicState({}).presetsApplied.length, 1);
+});
+
+test("autoApplied só é verdadeiro quando um preset veio do auto-aplicar", () => {
+  const { doc, win } = makeDoc("<body><p id='a'>oi</p></body>");
+  const session = makeSession(doc, win);
+  const preset = {
+    id: "preset-1",
+    name: "Meu preset",
+    ops: [{ op: "setStyle", selector: "#a", name: "color", value: "red", position: "" }],
+  };
+
+  session.applyPreset(preset);
+  let state = session.publicState({});
+  assert.equal(state.fromPreset, true);
+  assert.equal(state.autoApplied, false, "aplicado à mão pelo popup");
+
+  session.applyPreset({ ...preset, id: "preset-2" }, { auto: true });
+  state = session.publicState({});
+  assert.equal(state.autoApplied, true);
 });
