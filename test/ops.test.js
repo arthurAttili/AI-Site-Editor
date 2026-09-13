@@ -83,3 +83,34 @@ test("seletor inválido não lança", () => {
   assert.equal(r.matched, 0);
   assert.match(r.warning, /inválido/);
 });
+
+test("setStyle com !important aplica e desfaz", () => {
+  const { doc } = makeDoc("<body><p id='a' style='color: blue'>oi</p></body>");
+  const el = doc.getElementById("a");
+  const r = applyOp({ op: "setStyle", selector: "#a", name: "color", value: "red !important", position: "" }, doc);
+  assert.equal(el.style.getPropertyValue("color"), "red");
+  assert.equal(el.style.getPropertyPriority("color"), "important");
+  assert.equal(r.changes[0].after, "red !important");
+  r.undo();
+  assert.equal(el.style.color, "blue");
+  assert.equal(el.style.getPropertyPriority("color"), "");
+});
+
+test("remove desfeito fora de ordem não lança e restaura o nó", () => {
+  const { doc } = makeDoc("<body><ul id='l'><li id='a'>1</li><li id='b'>2</li><li id='c'>3</li></ul></body>");
+  const rb = applyOp({ op: "remove", selector: "#b", name: "", value: "", position: "" }, doc);
+  const rc = applyOp({ op: "remove", selector: "#c", name: "", value: "", position: "" }, doc);
+  // Desfaz fora de ordem: primeiro o mais antigo (b), cujo "next" original (c) já foi removido do DOM.
+  assert.doesNotThrow(() => rb.undo());
+  assert.equal(doc.getElementById("b").parentNode, doc.getElementById("l"));
+  assert.doesNotThrow(() => rc.undo());
+  assert.equal(doc.getElementById("c").parentNode, doc.getElementById("l"));
+});
+
+test("insertHTML com position inválida retorna warning sem lançar", () => {
+  const { doc } = makeDoc("<body><p id='a'>oi</p></body>");
+  const r = applyOp({ op: "insertHTML", selector: "#a", name: "", value: "<b>x</b>", position: "dentro" }, doc);
+  assert.equal(r.matched, 0);
+  assert.deepEqual(r.changes, []);
+  assert.match(r.warning, /inválida/);
+});
