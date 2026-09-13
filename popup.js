@@ -11,6 +11,7 @@ const UNEDITABLE_TEXT = "Esta página não pode ser editada";
 
 const root = document.getElementById("root");
 const view = createPopupView(document, root, {
+  onPickElement,
   onToggleOriginal,
   onUndoAll,
   onApplyPreset,
@@ -111,6 +112,15 @@ async function runAction(fn) {
     view.setError((err && err.message) || String(err));
   }
   view.setBusy(false);
+}
+
+// O popup fecha logo depois de ligar o picker: com ele aberto o mouse não
+// chega à página, então o usuário não teria como apontar o elemento.
+function onPickElement() {
+  runAction(async () => {
+    await sendAction("START_PICKER");
+    window.close();
+  });
 }
 
 function onToggleOriginal() {

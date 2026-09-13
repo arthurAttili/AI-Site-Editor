@@ -126,6 +126,29 @@ test("toggle-original e undo-all chamam onToggleOriginal e onUndoAll", () => {
   assert.deepEqual(calls, ["toggle", "undo-all"]);
 });
 
+test("Selecionar elemento chama onPickElement; fica desabilitado sem extensão ou ocupado", () => {
+  const { doc } = makeDoc("<body><div id='root'></div></body>");
+  const root = doc.getElementById("root");
+  let picks = 0;
+  const view = createPopupView(doc, root, { onPickElement: () => { picks++; } });
+  const btn = root.querySelector('[data-action="pick"]');
+  assert.equal(btn.textContent, "Selecionar elemento");
+  assert.equal(btn.disabled, true, "desabilitado antes do estado chegar");
+
+  view.setState({ activeCount: 0, originalMode: false });
+  assert.equal(btn.disabled, false, "sem alterações ainda dá para selecionar");
+  btn.click();
+  assert.equal(picks, 1);
+
+  view.setBusy(true);
+  assert.equal(btn.disabled, true);
+  view.setBusy(false);
+  assert.equal(btn.disabled, false);
+
+  view.setState(null);
+  assert.equal(btn.disabled, true, "extensão não carregada na aba");
+});
+
 test("o aviso fixo sobre auto-aplicar está sempre presente", () => {
   const { doc } = makeDoc("<body><div id='root'></div></body>");
   const root = doc.getElementById("root");

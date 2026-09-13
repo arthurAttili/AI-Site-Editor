@@ -25,6 +25,7 @@ if (!document.documentElement || document.contentType !== "text/html") return;
 let lastTarget = null;
 let session = null;
 let panel = null;
+let picker = null;
 let indicator = null;
 let logger = null;
 let settings = null;
@@ -50,6 +51,7 @@ document.addEventListener(
   "click",
   (e) => {
     if (!panel || !panel.isOpen() || !e.shiftKey) return;
+    if (picker && picker.isActive()) return; // o picker já trata o clique
     if (isAiseHostTarget(e.target)) return;
     e.preventDefault();
     session.toggle(e.target);
@@ -59,7 +61,7 @@ document.addEventListener(
 );
 
 function isAiseHostTarget(target) {
-  return typeof target.closest === "function" && !!target.closest("aise-panel, aise-indicator");
+  return typeof target.closest === "function" && !!target.closest("aise-panel, aise-indicator, aise-picker");
 }
 
 // Mensagens do background/DevTools/popup: o listener é registrado já, antes
@@ -87,7 +89,20 @@ async function handleMessage(message) {
 
   switch (message && message.type) {
     case "OPEN_EDITOR":
+      // Pelo menu de contexto: abre com o elemento clicado já selecionado e
+      // liga a mira, como o inspetor do F12 — um clique troca o alvo.
       openEditorFor(lastTarget || document.body);
+      startPicker();
+      return { ok: true, state: currentState() };
+    case "START_PICKER":
+      startPicker();
+      return { ok: true, state: currentState() };
+    case "STOP_PICKER":
+      stopPicker();
+      return { ok: true, state: currentState() };
+    case "TOGGLE_PICKER":
+      if (picker && picker.isActive()) stopPicker();
+      else startPicker();
       return { ok: true, state: currentState() };
     case "PICK_MARKED": {
       const el = document.querySelector("[data-aise-pick]");
@@ -141,7 +156,7 @@ async function handleMessage(message) {
 
 async function loadLibs() {
   const url = (path) => chrome.runtime.getURL(`lib/${path}`);
-  const [ops, selector, serialize, sanitize, prompt, storage, loggerMod, panelMod, indicatorMod, sessionMod] =
+  const [ops, selector, serialize, sanitize, prompt, storage, loggerMod, panelMod, indicatorMod, pickerMod, sessionMod] =
     await Promise.all([
       import(url("ops.js")),
       import(url("selector.js")),
@@ -152,6 +167,7 @@ async function loadLibs() {
       import(url("logger.js")),
       import(url("ui/panel.js")),
       import(url("ui/indicator.js")),
+      import(url("ui/picker.js")),
       import(url("session.js")),
     ]);
   return {
@@ -164,6 +180,7 @@ async function loadLibs() {
     logger: loggerMod,
     panel: panelMod,
     indicator: indicatorMod,
+    picker: pickerMod,
     session: sessionMod,
   };
 }
@@ -212,8 +229,52 @@ function ensurePanel() {
       syncSelectionUi();
     },
     onOpenOptions: () => sendToBackground({ type: "OPEN_OPTIONS" }),
+    onTogglePicker: () => {
+      if (picker && picker.isActive()) stopPicker();
+      else startPicker();
+    },
   });
   return panel;
+}
+
+// ---------------------------------------------------------------------------
+// Seletor de elementos ("mira"): ponteiro em cruz, contorno no elemento sob o
+// mouse; clique seleciona (e desliga), Shift+clique adiciona, Esc cancela.
+// ---------------------------------------------------------------------------
+
+function ensurePicker() {
+  if (picker) return picker;
+  picker = libs.picker.createPicker(document, {
+    onPick: (el, { additive }) => {
+      if (additive) {
+        ensurePanel();
+        if (!panel.isOpen()) {
+          openEditorFor(el);
+        } else {
+          session.toggle(el);
+          injectHighlightStyle();
+          syncSelectionUi();
+        }
+        return;
+      }
+      openEditorFor(el);
+      panel.setPicking(false);
+    },
+    onCancel: () => {
+      if (panel) panel.setPicking(false);
+    },
+  });
+  return picker;
+}
+
+function startPicker() {
+  ensurePicker().start();
+  if (panel) panel.setPicking(true);
+}
+
+function stopPicker() {
+  if (picker) picker.stop();
+  if (panel) panel.setPicking(false);
 }
 
 function syncSelectionUi() {
@@ -233,6 +294,7 @@ function openEditorFor(el) {
 }
 
 function closePanel() {
+  stopPicker();
   if (panel) panel.hide();
   session.clear();
   removeHighlightStyle();

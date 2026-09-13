@@ -142,6 +142,25 @@ test("modo original desabilita o botão de aplicar do painel e sair reabilita", 
   assert.equal(submit.disabled, false);
 });
 
+test("botão de mira do cabeçalho chama onTogglePicker e setPicking reflete aria-pressed", () => {
+  const { doc } = makeDoc("<body></body>");
+  let toggles = 0;
+  const p = createPanel(doc, { onSubmit() {}, onUndo() {}, onUndoAll() {}, onRedoAll() {}, onSavePreset() {}, onClose() {}, onRemoveSelection() {}, onOpenOptions() {}, onTogglePicker: () => { toggles++; } });
+  p.show();
+  const root = doc.querySelector("aise-panel").shadowRoot;
+  const btn = root.querySelector('[data-action="pick"]');
+  assert.equal(btn.getAttribute("aria-label"), "Selecionar elemento");
+  assert.equal(btn.getAttribute("aria-pressed"), "false");
+  btn.click();
+  assert.equal(toggles, 1);
+  p.setPicking(true);
+  assert.equal(btn.getAttribute("aria-pressed"), "true");
+  assert.ok(btn.classList.contains("aise-icon-btn-active"));
+  p.setPicking(false);
+  assert.equal(btn.getAttribute("aria-pressed"), "false");
+  assert.ok(!btn.classList.contains("aise-icon-btn-active"));
+});
+
 test("hide() cancela o timer do toast: ele não reaparece na próxima abertura", () => {
   const { doc, win } = makeDoc("<body></body>");
   const p = createPanel(doc, { onSubmit() {}, onUndo() {}, onUndoAll() {}, onRedoAll() {}, onSavePreset() {}, onClose() {}, onRemoveSelection() {}, onOpenOptions() {} });

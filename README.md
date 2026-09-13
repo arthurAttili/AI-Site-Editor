@@ -38,12 +38,13 @@ Clique em "Salvar" para gravar.
 
 ## Como usar
 
-1. Clique com o botão direito em qualquer elemento da página e escolha **"Editar com IA"** — o painel flutuante abre com aquele elemento já selecionado.
-2. Com o painel aberto, **Shift+clique** em outros elementos da página adiciona ou remove cada um da seleção atual (clicar de novo no mesmo elemento com Shift o tira da seleção).
-3. Escreva o pedido na caixa de texto (ex.: "deixe o botão vermelho e maior") e clique em **Aplicar** (ou Ctrl/Cmd+Enter).
-4. O histórico de pedidos aparece no painel, cada um com um botão **Desfazer**. Os botões **Desfazer tudo** e **Refazer tudo** agem sobre todo o histórico da sessão.
-5. Todo pedido gera um grupo recolhido no Console do DevTools, com o prefixo `[Editor IA] Pedido #N — "texto do pedido"`, mostrando as operações pedidas e as alterações de fato aplicadas (ou o aviso, se alguma operação não encontrou o alvo).
-6. Na aba **Elements** do DevTools existe uma sub-aba **"Editor IA"**: mostra o elemento atualmente inspecionado, tem um botão **"Usar elemento selecionado"** (usa o `$0` do DevTools como alvo) e espelha o mesmo histórico de pedidos da página, com os mesmos botões de desfazer.
+1. Clique com o botão direito em qualquer elemento da página e escolha **"Editar com IA"** — o painel flutuante abre com aquele elemento já selecionado e o ponteiro vira uma **mira**, como o inspetor do DevTools (F12): o elemento sob o mouse ganha um contorno laranja com o rótulo `tag#id.classe` e o tamanho. Um **clique** troca a seleção por aquele elemento e desliga a mira; **Shift+clique** adiciona o elemento à seleção e mantém a mira ligada; **Esc** cancela.
+2. A mira também liga e desliga pelo botão **⌖** no cabeçalho do painel e pelo botão **"Selecionar elemento"** no popup da extensão (ícone na toolbar) — o popup fecha sozinho para o mouse chegar à página.
+3. Com o painel aberto e a mira desligada, **Shift+clique** em outros elementos da página adiciona ou remove cada um da seleção atual (clicar de novo no mesmo elemento com Shift o tira da seleção).
+4. Escreva o pedido na caixa de texto (ex.: "deixe o botão vermelho e maior") e clique em **Aplicar** (ou Ctrl/Cmd+Enter).
+5. O histórico de pedidos aparece no painel, cada um com um botão **Desfazer**. Os botões **Desfazer tudo** e **Refazer tudo** agem sobre todo o histórico da sessão.
+6. Todo pedido gera um grupo recolhido no Console do DevTools, com o prefixo `[Editor IA] Pedido #N — "texto do pedido"`, mostrando as operações pedidas e as alterações de fato aplicadas (ou o aviso, se alguma operação não encontrou o alvo).
+7. Na aba **Elements** do DevTools existe uma sub-aba **"Editor IA"**: mostra o elemento atualmente inspecionado, tem um botão **"Usar elemento selecionado"** (usa o `$0` do DevTools como alvo) e espelha o mesmo histórico de pedidos da página, com os mesmos botões de desfazer.
 
 ## Presets e o aviso de site modificado
 
@@ -94,8 +95,11 @@ Sem build step: JS puro (ES modules), Node 24, testes com `node --test` e `jsdom
 ## Checklist manual de QA
 
 - [ ] Carregar a extensão sem compactação em `chrome://extensions`
-- [ ] Ir a `https://example.com`, clicar com o botão direito em um elemento e escolher "Editar com IA"
-- [ ] Selecionar 2 elementos com Shift+clique e editar os dois em um único pedido
+- [ ] Ir a `https://example.com`, clicar com o botão direito em um elemento e escolher "Editar com IA": o painel abre e o ponteiro vira mira
+- [ ] Passar o mouse sobre outros elementos (contorno + rótulo acompanham), clicar em um e conferir que a seleção trocou e a mira desligou
+- [ ] Ligar a mira pelo botão ⌖ do painel, juntar um 2º elemento com Shift+clique e editar os dois em um único pedido
+- [ ] Ligar a mira pelo botão "Selecionar elemento" do popup e cancelar com Esc
+- [ ] Abrir as Opções no modo escuro do Chrome: só a seção do provedor escolhido aparece e os dropdowns ficam legíveis
 - [ ] Desfazer um dos pedidos pelo painel
 - [ ] Conferir o grupo do pedido no Console (`[Editor IA] Pedido #N — "..."`)
 - [ ] Abrir o DevTools → aba Elements → sidebar "Editor IA", selecionar um nó na árvore, usar "Usar elemento selecionado" e enviar um pedido por ali
